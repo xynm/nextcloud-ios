@@ -49,10 +49,13 @@ class NCTrashListCell: UICollectionViewCell {
     override func awakeFromNib() {
         super.awakeFromNib()
        
-        imageRestore.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "restore"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-        imageMore.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "more"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
+        imageRestore.image =  UIImage(named: "restore")!.image(color: NCBrandColor.shared.optionItem, size: 25)
+        imageMore.image = UIImage(named: "more")!.image(color: NCBrandColor.shared.optionItem, size: 25)
         
-        separator.backgroundColor = NCBrandColor.sharedInstance.separator
+        imageItem.layer.cornerRadius = 6
+        imageItem.layer.masksToBounds = true
+        
+        separator.backgroundColor = NCBrandColor.shared.separator
     }
     
     @IBAction func touchUpInsideMore(_ sender: Any) {
@@ -61,6 +64,34 @@ class NCTrashListCell: UICollectionViewCell {
     
     @IBAction func touchUpInsideRestore(_ sender: Any) {
         delegate?.tapRestoreListItem(with: objectId, sender: sender)
+    }
+    
+    func selectMode(_ status: Bool) {
+        if status {
+            imageItemLeftConstraint.constant = 45
+            imageSelect.isHidden = false
+        } else {
+            imageItemLeftConstraint.constant = 10
+            imageSelect.isHidden = true
+            backgroundView = nil
+        }
+    }
+    
+    func selected(_ status: Bool) {
+        if status {
+            imageSelect.image = NCCollectionCommon.images.cellCheckedYes
+            
+            let blurEffect = UIBlurEffect(style: .extraLight)
+            let blurEffectView = UIVisualEffectView(effect: blurEffect)
+            blurEffectView.frame = self.bounds
+            blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            blurEffectView.backgroundColor = NCBrandColor.shared.brandElement.withAlphaComponent(0.2)
+            backgroundView = blurEffectView
+            
+        } else {
+            imageSelect.image = NCCollectionCommon.images.cellCheckedNo
+            backgroundView = nil
+        }
     }
 }
 

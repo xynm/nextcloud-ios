@@ -3,7 +3,7 @@
 //  Nextcloud
 //
 //  Created by Marino Faggiana on 02/02/16.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2016 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -22,9 +22,10 @@
 //
 
 #import "CCUtility.h"
-#import "CCGraphics.h"
 #import "NCBridgeSwift.h"
+#import "NSNotificationCenter+MainThread.h"
 #import <OpenSSL/OpenSSL.h>
+#import <CoreLocation/CoreLocation.h>
 
 #define INTRO_MessageType       @"MessageType_"
 
@@ -42,7 +43,7 @@
 + (void)deleteAllChainStore
 {
     [UICKeyChainStore removeAllItems];
-    [UICKeyChainStore removeAllItemsForService:k_serviceShareKeyChain];
+    [UICKeyChainStore removeAllItemsForService:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)storeAllChainInService
@@ -53,121 +54,56 @@
     
     for (NSDictionary *item in items) {
         
-        [UICKeyChainStore setString:[item objectForKey:@"value"] forKey:[item objectForKey:@"key"] service:k_serviceShareKeyChain];
+        [UICKeyChainStore setString:[item objectForKey:@"value"] forKey:[item objectForKey:@"key"] service:NCBrandGlobal.shared.serviceShareKeyChain];
         [UICKeyChainStore removeItemForKey:[item objectForKey:@"key"]];
     }
 }
 
 #pragma ------------------------------ GET/SET
 
-+ (NSString *)getVersion
++ (NSString *)getPasscode
 {
-    return [UICKeyChainStore stringForKey:@"version" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"passcodeBlock" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
-+ (NSString *)setVersion
++ (void)setPasscode:(NSString *)passcode
 {
-    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    [UICKeyChainStore setString:passcode forKey:@"passcodeBlock" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (BOOL)getNotPasscodeAtStart
+{
+    return [[UICKeyChainStore stringForKey:@"notPasscodeAtStart" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
+}
+
++ (void)setNotPasscodeAtStart:(BOOL)set
+{
+    NSString *sSet = (set) ? @"true" : @"false";
+    [UICKeyChainStore setString:sSet forKey:@"notPasscodeAtStart" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (BOOL)getEnableTouchFaceID
+{
+    NSString *valueString = [UICKeyChainStore stringForKey:@"enableTouchFaceID" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
-    [UICKeyChainStore setString:version forKey:@"version" service:k_serviceShareKeyChain];
-    
-    return version;
-}
-
-+ (NSString *)getBuild
-{
-    return [UICKeyChainStore stringForKey:@"build" service:k_serviceShareKeyChain];
-}
-
-+ (NSString *)setBuild
-{
-    NSString *build = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
-    
-    [UICKeyChainStore setString:build forKey:@"build" service:k_serviceShareKeyChain];
-    
-    return build;
-}
-
-+ (NSString *)getBlockCode
-{
-    return [UICKeyChainStore stringForKey:@"blockcode" service:k_serviceShareKeyChain];
-}
-
-+ (void)setBlockCode:(NSString *)blockcode
-{
-    [UICKeyChainStore setString:blockcode forKey:@"blockcode" service:k_serviceShareKeyChain];
-}
-
-+ (BOOL)getSimplyBlockCode
-{
-    NSString *simplyBlockCode = [UICKeyChainStore stringForKey:@"simplyblockcode" service:k_serviceShareKeyChain];
-    
-    if (simplyBlockCode == nil) {
-        
-        [self setSimplyBlockCode:YES];
-        return YES;
+    // Default TRUE
+    if (valueString == nil) {
+        [self setEnableTouchFaceID:YES];
+        return true;
     }
     
-    return [simplyBlockCode boolValue];
+    return [valueString boolValue];
 }
 
-+ (void)setSimplyBlockCode:(BOOL)simply
++ (void)setEnableTouchFaceID:(BOOL)set
 {
-    NSString *sSimply = (simply) ? @"true" : @"false";
-    [UICKeyChainStore setString:sSimply forKey:@"simplyblockcode" service:k_serviceShareKeyChain];
-}
-
-+ (BOOL)getOnlyLockDir
-{
-    return [[UICKeyChainStore stringForKey:@"onlylockdir" service:k_serviceShareKeyChain] boolValue];
-}
-
-+ (void)setOnlyLockDir:(BOOL)lockDir
-{
-    NSString *sLockDir = (lockDir) ? @"true" : @"false";
-    [UICKeyChainStore setString:sLockDir forKey:@"onlylockdir" service:k_serviceShareKeyChain];
-}
-
-+ (NSString *)getOrderSettings
-{
-    NSString *order = [UICKeyChainStore stringForKey:@"order" service:k_serviceShareKeyChain];
-    
-    if (order == nil) {
-        
-        [self setOrderSettings:@"fileName"];
-        return @"fileName";
-    }
-    
-    return order;
-}
-
-+ (void)setOrderSettings:(NSString *)order
-{
-    [UICKeyChainStore setString:order forKey:@"order" service:k_serviceShareKeyChain];
-}
-
-+ (BOOL)getAscendingSettings
-{
-    NSString *ascending = [UICKeyChainStore stringForKey:@"ascending" service:k_serviceShareKeyChain];
-    
-    if (ascending == nil) {
-        
-        [self setAscendingSettings:YES];
-        return YES;
-    }
-    
-    return [ascending boolValue];
-}
-
-+ (void)setAscendingSettings:(BOOL)ascendente
-{
-    NSString *sAscendente = (ascendente) ? @"true" : @"false";
-    [UICKeyChainStore setString:sAscendente forKey:@"ascending" service:k_serviceShareKeyChain];
+    NSString *sSet = (set) ? @"true" : @"false";
+    [UICKeyChainStore setString:sSet forKey:@"enableTouchFaceID" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getGroupBySettings
 {
-    NSString *groupby = [UICKeyChainStore stringForKey:@"groupby" service:k_serviceShareKeyChain];
+    NSString *groupby = [UICKeyChainStore stringForKey:@"groupby" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     if (groupby == nil) {
         
@@ -175,144 +111,127 @@
         return @"none";
     }
     
-    return groupby;
+    return @"none";
+    
+    //return groupby;
 }
 
 + (void)setGroupBySettings:(NSString *)groupby
 {
-    [UICKeyChainStore setString:groupby forKey:@"groupby" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:groupby forKey:@"groupby" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getIntro
 {
     // Set compatibility old version don't touch me
-    if ([[UICKeyChainStore stringForKey:[INTRO_MessageType stringByAppendingString:@"Intro"] service:k_serviceShareKeyChain] boolValue] == YES) {
+    if ([[UICKeyChainStore stringForKey:[INTRO_MessageType stringByAppendingString:@"Intro"] service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue] == YES) {
         [CCUtility setIntro:YES];
         return YES;
     }
     
-    return [[UICKeyChainStore stringForKey:@"intro" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"intro" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (BOOL)getIntroMessageOldVersion
 {
     NSString *key = [INTRO_MessageType stringByAppendingString:@"Intro"];
     
-    return [[UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setIntro:(BOOL)set
 {
     NSString *sIntro = (set) ? @"true" : @"false";
-    [UICKeyChainStore setString:sIntro forKey:@"intro" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sIntro forKey:@"intro" service:NCBrandGlobal.shared.serviceShareKeyChain];
 
 }
 
 + (NSString *)getIncrementalNumber
 {
-    long number = [[UICKeyChainStore stringForKey:@"incrementalnumber" service:k_serviceShareKeyChain] intValue];
+    long number = [[UICKeyChainStore stringForKey:@"incrementalnumber" service:NCBrandGlobal.shared.serviceShareKeyChain] intValue];
     
     number++;
     if (number >= 9999) number = 1;
     
-    [UICKeyChainStore setString:[NSString stringWithFormat:@"%ld", number] forKey:@"incrementalnumber"];
+    [UICKeyChainStore setString:[NSString stringWithFormat:@"%ld", number] forKey:@"incrementalnumber" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     return [NSString stringWithFormat:@"%04ld", number];
 }
 
-+ (NSString *)getActiveAccountExt
++ (NSString *)getAccountExt
 {
-    return [UICKeyChainStore stringForKey:@"activeAccountExt" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"accountExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
-+ (void)setActiveAccountExt:(NSString *)activeAccount
++ (void)setAccountExt:(NSString *)account
 {
-    [UICKeyChainStore setString:activeAccount forKey:@"activeAccountExt" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:account forKey:@"accountExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getServerUrlExt
 {
-    return [UICKeyChainStore stringForKey:@"serverUrlExt" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"serverUrlExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setServerUrlExt:(NSString *)serverUrl
 {
-    [UICKeyChainStore setString:serverUrl forKey:@"serverUrlExt" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:serverUrl forKey:@"serverUrlExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getTitleServerUrlExt
 {
-    return [UICKeyChainStore stringForKey:@"titleServerUrlExt" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"titleServerUrlExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setTitleServerUrlExt:(NSString *)titleServerUrl
 {
-    [UICKeyChainStore setString:titleServerUrl forKey:@"titleServerUrlExt" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:titleServerUrl forKey:@"titleServerUrlExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getFileNameExt
 {
-    return [UICKeyChainStore stringForKey:@"fileNameExt" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"fileNameExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setFileNameExt:(NSString *)fileName
 {
-    [UICKeyChainStore setString:fileName forKey:@"fileNameExt" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:fileName forKey:@"fileNameExt" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getEmail
 {
-    return [UICKeyChainStore stringForKey:@"email" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"email" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setEmail:(NSString *)email
 {
-    [UICKeyChainStore setString:email forKey:@"email" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:email forKey:@"email" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getHint
 {
-    return [UICKeyChainStore stringForKey:@"hint" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"hint" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setHint:(NSString *)hint
 {
-    [UICKeyChainStore setString:hint forKey:@"hint" service:k_serviceShareKeyChain];
-}
-
-+ (BOOL)getDirectoryOnTop
-{
-    NSString *valueString = [UICKeyChainStore stringForKey:@"directoryOnTop" service:k_serviceShareKeyChain];
-    
-    // Default TRUE
-    if (valueString == nil) {
-        [self setDirectoryOnTop:YES];
-        return true;
-    }
-    
-    return [valueString boolValue];
-}
-
-+ (void)setDirectoryOnTop:(BOOL)directoryOnTop
-{
-    NSString *sDirectoryOnTop = (directoryOnTop) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDirectoryOnTop forKey:@"directoryOnTop" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:hint forKey:@"hint" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getOriginalFileName:(NSString *)key
 {
-    return [[UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setOriginalFileName:(BOOL)value key:(NSString *)key
 {
     NSString *sValue = (value) ? @"true" : @"false";
-    [UICKeyChainStore setString:sValue forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sValue forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getFileNameMask:(NSString *)key
 {
-    NSString *mask = [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    NSString *mask = [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     if (mask == nil)
         mask = @"";
@@ -322,56 +241,45 @@
 
 + (void)setFileNameMask:(NSString *)mask key:(NSString *)key
 {
-    [UICKeyChainStore setString:mask forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:mask forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getFileNameType:(NSString *)key
 {
-    return [[UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setFileNameType:(BOOL)prefix key:(NSString *)key
 {
     NSString *sPrefix = (prefix) ? @"true" : @"false";
-    [UICKeyChainStore setString:sPrefix forKey:key service:k_serviceShareKeyChain];
-}
-
-+ (BOOL)getFavoriteOffline
-{
-    return [[UICKeyChainStore stringForKey:@"favoriteOffline" service:k_serviceShareKeyChain] boolValue];
-}
-
-+ (void)setFavoriteOffline:(BOOL)offline
-{
-    NSString *sFavoriteOffline = (offline) ? @"true" : @"false";
-    [UICKeyChainStore setString:sFavoriteOffline forKey:@"favoriteOffline" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sPrefix forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getActivityVerboseHigh
 {
-    return [[UICKeyChainStore stringForKey:@"activityVerboseHigh" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"activityVerboseHigh" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setActivityVerboseHigh:(BOOL)high
 {
     NSString *sHigh = (high) ? @"true" : @"false";
-    [UICKeyChainStore setString:sHigh forKey:@"activityVerboseHigh" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sHigh forKey:@"activityVerboseHigh" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getShowHiddenFiles
 {
-    return [[UICKeyChainStore stringForKey:@"showHiddenFiles" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"showHiddenFiles" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setShowHiddenFiles:(BOOL)show
 {
     NSString *sShow = (show) ? @"true" : @"false";
-    [UICKeyChainStore setString:sShow forKey:@"showHiddenFiles" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sShow forKey:@"showHiddenFiles" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getFormatCompatibility
 {
-    NSString *valueString = [UICKeyChainStore stringForKey:@"formatCompatibility" service:k_serviceShareKeyChain];
+    NSString *valueString = [UICKeyChainStore stringForKey:@"formatCompatibility" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     // Default TRUE
     if (valueString == nil) {
@@ -385,68 +293,69 @@
 + (void)setFormatCompatibility:(BOOL)set
 {
     NSString *sSet = (set) ? @"true" : @"false";
-    [UICKeyChainStore setString:sSet forKey:@"formatCompatibility" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sSet forKey:@"formatCompatibility" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getEndToEndPublicKey:(NSString *)account
 {
     NSString *key = [E2E_PublicKey stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setEndToEndPublicKey:(NSString *)account publicKey:(NSString *)publicKey
 {
     NSString *key = [E2E_PublicKey stringByAppendingString:account];
-    [UICKeyChainStore setString:publicKey forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:publicKey forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getEndToEndPrivateKey:(NSString *)account
 {
     NSString *key = [E2E_PrivateKey stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setEndToEndPrivateKey:(NSString *)account privateKey:(NSString *)privateKey
 {
     NSString *key = [E2E_PrivateKey stringByAppendingString:account];
-    [UICKeyChainStore setString:privateKey forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:privateKey forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getEndToEndPassphrase:(NSString *)account
 {
     NSString *key = [E2E_Passphrase stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setEndToEndPassphrase:(NSString *)account passphrase:(NSString *)passphrase
 {
     NSString *key = [E2E_Passphrase stringByAppendingString:account];
-    [UICKeyChainStore setString:passphrase forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:passphrase forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getEndToEndPublicKeyServer:(NSString *)account
 {
     NSString *key = [E2E_PublicKeyServer stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setEndToEndPublicKeyServer:(NSString *)account publicKey:(NSString *)publicKey
 {
     NSString *key = [E2E_PublicKeyServer stringByAppendingString:account];
-    [UICKeyChainStore setString:publicKey forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:publicKey forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)isEndToEndEnabled:(NSString *)account
 {
-    tableCapabilities *capabilities = [[NCManageDatabase sharedInstance] getCapabilitesWithAccount:account];
-
+    BOOL isE2EEEnabled = [[NCManageDatabase shared] getCapabilitiesServerBoolWithAccount:account elements:NCElementsJSON.shared.capabilitiesE2EEEnabled exists:false];
+    NSString* versionE2EE = [[NCManageDatabase shared] getCapabilitiesServerStringWithAccount:account elements:NCElementsJSON.shared.capabilitiesE2EEApiVersion];
+    
     NSString *publicKey = [self getEndToEndPublicKey:account];
     NSString *privateKey = [self getEndToEndPrivateKey:account];
     NSString *passphrase = [self getEndToEndPassphrase:account];
     NSString *publicKeyServer = [self getEndToEndPublicKeyServer:account];    
-    
-    if (passphrase.length > 0 && privateKey.length > 0 && publicKey.length > 0 && publicKeyServer.length > 0 && capabilities.endToEndEncryption) {
-        
+            
+    if (passphrase.length > 0 && privateKey.length > 0 && publicKey.length > 0 && publicKeyServer.length > 0 && isE2EEEnabled && [versionE2EE isEqual:[[NCBrandGlobal shared] e2eeVersion]]) {
+       
         return YES;
         
     } else {
@@ -465,85 +374,85 @@
 
 + (BOOL)getDisableFilesApp
 {
-    return [[UICKeyChainStore stringForKey:@"disablefilesapp" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"disablefilesapp" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setDisableFilesApp:(BOOL)disable
 {
     NSString *sDisable = (disable) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDisable forKey:@"disablefilesapp" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sDisable forKey:@"disablefilesapp" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationPublicKey:(NSString *)account data:(NSData *)data
 {
     NSString *key = [@"PNPublicKey" stringByAppendingString:account];
-    [UICKeyChainStore setData:data forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setData:data forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSData *)getPushNotificationPublicKey:(NSString *)account
 {
     NSString *key = [@"PNPublicKey" stringByAppendingString:account];
-    return [UICKeyChainStore dataForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore dataForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationSubscribingPublicKey:(NSString *)account publicKey:(NSString *)publicKey
 {
     NSString *key = [@"PNSubscribingPublicKey" stringByAppendingString:account];
-    [UICKeyChainStore setString:publicKey forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:publicKey forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getPushNotificationSubscribingPublicKey:(NSString *)account
 {
     NSString *key = [@"PNSubscribingPublicKey" stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationPrivateKey:(NSString *)account data:(NSData *)data
 {
     NSString *key = [@"PNPrivateKey" stringByAppendingString:account];
-    [UICKeyChainStore setData:data forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setData:data forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSData *)getPushNotificationPrivateKey:(NSString *)account
 {
     NSString *key = [@"PNPrivateKey" stringByAppendingString:account];
-    return [UICKeyChainStore dataForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore dataForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationToken:(NSString *)account token:(NSString *)token
 {
     NSString *key = [@"PNToken" stringByAppendingString:account];
-    [UICKeyChainStore setString:token forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:token forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getPushNotificationToken:(NSString *)account
 {
     NSString *key = [@"PNToken" stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationDeviceIdentifier:(NSString *)account deviceIdentifier:(NSString *)deviceIdentifier
 {
     NSString *key = [@"PNDeviceIdentifier" stringByAppendingString:account];
-    [UICKeyChainStore setString:deviceIdentifier forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:deviceIdentifier forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getPushNotificationDeviceIdentifier:(NSString *)account
 {
     NSString *key = [@"PNDeviceIdentifier" stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPushNotificationDeviceIdentifierSignature:(NSString *)account deviceIdentifierSignature:(NSString *)deviceIdentifierSignature
 {
     NSString *key = [@"PNDeviceIdentifierSignature" stringByAppendingString:account];
-    [UICKeyChainStore setString:deviceIdentifierSignature forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:deviceIdentifierSignature forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getPushNotificationDeviceIdentifierSignature:(NSString *)account
 {
     NSString *key = [@"PNDeviceIdentifierSignature" stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)clearAllKeysPushNotification:(NSString *)account
@@ -558,7 +467,7 @@
 
 + (NSInteger)getMediaWidthImage
 {
-    NSString *width = [UICKeyChainStore stringForKey:@"mediaWidthImage" service:k_serviceShareKeyChain];
+    NSString *width = [UICKeyChainStore stringForKey:@"mediaWidthImage" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     if (width == nil) {
         return 80;
@@ -570,49 +479,49 @@
 + (void)setMediaWidthImage:(NSInteger)width
 {
     NSString *widthString = [@(width) stringValue];
-    [UICKeyChainStore setString:widthString forKey:@"mediaWidthImage" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:widthString forKey:@"mediaWidthImage" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getDisableCrashservice
 {
-    return [[UICKeyChainStore stringForKey:@"crashservice" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"crashservice" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setDisableCrashservice:(BOOL)disable
 {
     NSString *sDisable = (disable) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDisable forKey:@"crashservice" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sDisable forKey:@"crashservice" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setPassword:(NSString *)account password:(NSString *)password
 {
     NSString *key = [@"password" stringByAppendingString:account];
-    [UICKeyChainStore setString:password forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:password forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getPassword:(NSString *)account
 {
     NSString *key = [@"password" stringByAppendingString:account];
-    return [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (void)setHCBusinessType:(NSString *)professions
 {
-    [UICKeyChainStore setString:professions forKey:@"businessType" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:professions forKey:@"businessType" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSString *)getHCBusinessType
 {
-    return [UICKeyChainStore stringForKey:@"businessType" service:k_serviceShareKeyChain];
+    return [UICKeyChainStore stringForKey:@"businessType" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (NSData *)getDatabaseEncryptionKey
 {
-    NSData *key = [UICKeyChainStore dataForKey:@"databaseEncryptionKey" service:k_serviceShareKeyChain];
+    NSData *key = [UICKeyChainStore dataForKey:@"databaseEncryptionKey" service:NCBrandGlobal.shared.serviceShareKeyChain];
     if (key == nil) {
         NSMutableData *key = [NSMutableData dataWithLength:64];
         (void)SecRandomCopyBytes(kSecRandomDefault, key.length, (uint8_t *)key.mutableBytes);
-        [UICKeyChainStore setData:key forKey:@"databaseEncryptionKey" service:k_serviceShareKeyChain];
+        [UICKeyChainStore setData:key forKey:@"databaseEncryptionKey" service:NCBrandGlobal.shared.serviceShareKeyChain];
         return key;
     } else {
         return key;
@@ -621,13 +530,13 @@
 
 + (void)setDatabaseEncryptionKey:(NSData *)data
 {
-    [UICKeyChainStore setData:data forKey:@"databaseEncryptionKey" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setData:data forKey:@"databaseEncryptionKey" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getCertificateError:(NSString *)account
 {
     NSString *key = [@"certificateError" stringByAppendingString:account];
-    NSString *error = [UICKeyChainStore stringForKey:key service:k_serviceShareKeyChain];
+    NSString *error = [UICKeyChainStore stringForKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     if (error == nil) {
         
@@ -640,37 +549,57 @@
 
 + (void)setCertificateError:(NSString *)account error:(BOOL)error
 {
+    // In background do not write the error
+    UIApplicationState state = [[UIApplication sharedApplication] applicationState];
+    if (error && (state == UIApplicationStateBackground || state == UIApplicationStateInactive)) {
+        return;
+    }
+    
     NSString *key = [@"certificateError" stringByAppendingString:account];
     NSString *sError = (error) ? @"true" : @"false";
     
-    [UICKeyChainStore setString:sError forKey:key service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sError forKey:key service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getDisableLocalCacheAfterUpload
 {
-    return [[UICKeyChainStore stringForKey:@"disableLocalCacheAfterUpload" service:k_serviceShareKeyChain] boolValue];
+    return [[UICKeyChainStore stringForKey:@"disableLocalCacheAfterUpload" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
 }
 
 + (void)setDisableLocalCacheAfterUpload:(BOOL)disable
 {
     NSString *sDisable = (disable) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDisable forKey:@"disableLocalCacheAfterUpload" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sDisable forKey:@"disableLocalCacheAfterUpload" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getDarkMode
 {
-    return [[UICKeyChainStore stringForKey:@"darkMode" service:k_serviceShareKeyChain] boolValue];
+    NSString *sDisable = [UICKeyChainStore stringForKey:@"darkMode" service:NCBrandGlobal.shared.serviceShareKeyChain];
+    if(!sDisable){
+        if (@available(iOS 13.0, *)) {
+            if ([CCUtility getDarkModeDetect]) {
+                if ([[UITraitCollection currentTraitCollection] userInterfaceStyle] == UIUserInterfaceStyleDark) {
+                    sDisable = @"YES";
+                    [CCUtility setDarkMode:YES];
+                } else {
+                    sDisable = @"NO";
+                    [CCUtility setDarkMode:NO];
+                }
+            }
+        }
+    }
+    return [sDisable boolValue];
 }
 
 + (void)setDarkMode:(BOOL)disable
 {
     NSString *sDisable = (disable) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDisable forKey:@"darkMode" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sDisable forKey:@"darkMode" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
 
 + (BOOL)getDarkModeDetect
 {
-    NSString *valueString = [UICKeyChainStore stringForKey:@"darkModeDetect" service:k_serviceShareKeyChain];
+    NSString *valueString = [UICKeyChainStore stringForKey:@"darkModeDetect" service:NCBrandGlobal.shared.serviceShareKeyChain];
     
     // Default TRUE
     if (valueString == nil) {
@@ -684,8 +613,112 @@
 + (void)setDarkModeDetect:(BOOL)disable
 {
     NSString *sDisable = (disable) ? @"true" : @"false";
-    [UICKeyChainStore setString:sDisable forKey:@"darkModeDetect" service:k_serviceShareKeyChain];
+    [UICKeyChainStore setString:sDisable forKey:@"darkModeDetect" service:NCBrandGlobal.shared.serviceShareKeyChain];
 }
+
++ (BOOL)getLivePhoto
+{
+    NSString *valueString = [UICKeyChainStore stringForKey:@"livePhoto" service:NCBrandGlobal.shared.serviceShareKeyChain];
+    
+    // Default TRUE
+    if (valueString == nil) {
+        [self setLivePhoto:YES];
+        return true;
+    }
+    
+    return [valueString boolValue];
+}
+
++ (void)setLivePhoto:(BOOL)set
+{
+    NSString *sSet = (set) ? @"true" : @"false";
+    [UICKeyChainStore setString:sSet forKey:@"livePhoto" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (NSString *)getMediaSortDate
+{
+    NSString *valueString = [UICKeyChainStore stringForKey:@"mediaSortDate" service:NCBrandGlobal.shared.serviceShareKeyChain];
+    
+    // Default TRUE
+    if (valueString == nil) {
+        [self setMediaSortDate:@"date"];
+        return @"date";
+    }
+    
+    return valueString;
+}
+
++ (void)setMediaSortDate:(NSString *)value
+{
+    [UICKeyChainStore setString:value forKey:@"mediaSortDate" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (NSInteger)getTextRecognitionStatus
+{
+    NSString *value = [UICKeyChainStore stringForKey:@"textRecognitionStatus" service:NCBrandGlobal.shared.serviceShareKeyChain];
+    
+    if (value == nil) {
+        return 0;
+    } else {
+        return [value integerValue];
+    }
+}
+
++ (void)setTextRecognitionStatus:(NSInteger)value
+{
+    NSString *valueString = [@(value) stringValue];
+    [UICKeyChainStore setString:valueString forKey:@"textRecognitionStatus" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (NSString *)getDirectoryScanDocuments
+{
+    return [UICKeyChainStore stringForKey:@"directoryScanDocuments" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (void)setDirectoryScanDocuments:(NSString *)value
+{
+    [UICKeyChainStore setString:value forKey:@"directoryScanDocuments" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (NSInteger)getLogLevel
+{
+    NSString *value = [UICKeyChainStore stringForKey:@"logLevel" service:NCBrandGlobal.shared.serviceShareKeyChain];
+    
+    if (value == nil) {
+        return 1;
+    } else {
+        return [value integerValue];
+    }
+}
+
++ (void)setLogLevel:(NSInteger)value
+{
+    NSString *valueString = [@(value) stringValue];
+    [UICKeyChainStore setString:valueString forKey:@"logLevel" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (BOOL)getAudioMute
+{
+    return [[UICKeyChainStore stringForKey:@"audioMute" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
+}
+
++ (void)setAudioMute:(BOOL)set
+{
+    NSString *sSet = (set) ? @"true" : @"false";
+    [UICKeyChainStore setString:sSet forKey:@"audioMute" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
++ (BOOL)getAutomaticDownloadImage
+{
+    return [[UICKeyChainStore stringForKey:@"automaticDownloadImage" service:NCBrandGlobal.shared.serviceShareKeyChain] boolValue];
+}
+
++ (void)setAutomaticDownloadImage:(BOOL)set
+{
+    NSString *sSet = (set) ? @"true" : @"false";
+    [UICKeyChainStore setString:sSet forKey:@"automaticDownloadImage" service:NCBrandGlobal.shared.serviceShareKeyChain];
+}
+
 
 #pragma --------------------------------------------------------------------------------------------
 #pragma mark ===== Various =====
@@ -707,7 +740,7 @@
 + (NSString *)getUserAgent
 {
     NSString *appVersion = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
-    NSString *userAgent = [[NCBrandOptions sharedInstance] userAgent];
+    NSString *userAgent = [[NCBrandOptions shared] userAgent];
     
     return [NSString stringWithFormat:@"Mozilla/5.0 (iOS) %@/%@", userAgent, appVersion];
 }
@@ -741,25 +774,7 @@
     }
 }
 
-
-+ (NSDate *)dateEnUsPosixFromCloud:(NSString *)dateString
-{
-    NSDate *date = [NSDate date];
-    NSError *error;
-    NSDateFormatter *dateFormatter = [NSDateFormatter new];
-    NSLocale *enUSPOSIXLocale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    [dateFormatter setLocale:enUSPOSIXLocale];
-    [dateFormatter setDateFormat:@"EEE, dd MMM y HH:mm:ss zzz"];
-
-    if (![dateFormatter getObjectValue:&date forString:dateString range:nil error:&error]) {
-        NSLog(@"[LOG] Date '%@' could not be parsed: %@", dateString, error);
-        date = [NSDate date];
-    }
-
-    return date;
-}
-
-+ (NSString *)transformedSize:(double)value
++ (NSString *)transformedSize:(int64_t)value
 {
     NSString *string = [NSByteCountFormatter stringFromByteCount:value countStyle:NSByteCountFormatterCountStyleBinary];
     return string;
@@ -819,8 +834,25 @@
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setDateFormat:@"yy-MM-dd HH-mm-ss"];
     NSString *fileNameDate = [formatter stringFromDate:[NSDate date]];
+    NSString *returnFileName;
     
-    return [NSString stringWithFormat:@"%@ %@.%@", fileName, fileNameDate, extension];
+    if ([fileName isEqualToString:@""] && ![extension isEqualToString:@""]) {
+        returnFileName = [NSString stringWithFormat:@"%@.%@", fileNameDate, extension];
+    }
+    
+    if (![fileName isEqualToString:@""] && [extension isEqualToString:@""]) {
+        returnFileName = [NSString stringWithFormat:@"%@ %@", fileName, fileNameDate];
+    }
+    
+    if ([fileName isEqualToString:@""] && [extension isEqualToString:@""]) {
+        returnFileName = fileNameDate;
+    }
+    
+    if (![fileName isEqualToString:@""] && ![extension isEqualToString:@""]) {
+        returnFileName = [NSString stringWithFormat:@"%@ %@.%@", fileName, fileNameDate, extension];
+    }
+    
+    return returnFileName;
 }
 
 + (NSString *)createFileName:(NSString *)fileName fileDate:(NSDate *)fileDate fileType:(PHAssetMediaType)fileType keyFileName:(NSString *)keyFileName keyFileNameType:(NSString *)keyFileNameType keyFileNameOriginal:(NSString *)keyFileNameOriginal
@@ -945,13 +977,13 @@
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     
     // create Directory database Nextcloud
-    path = [[dirGroup URLByAppendingPathComponent:k_appDatabaseNextcloud] path];
+    path = [[dirGroup URLByAppendingPathComponent:[[NCBrandGlobal shared] appDatabaseNextcloud]] path];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     [[NSFileManager defaultManager] setAttributes:@{NSFileProtectionKey:NSFileProtectionNone} ofItemAtPath:path error:nil];
     
     // create Directory User Data
-    path = [[dirGroup URLByAppendingPathComponent:k_appUserData] path];
+    path = [[dirGroup URLByAppendingPathComponent:NCBrandGlobal.shared.appUserData] path];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     
@@ -961,7 +993,7 @@
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     
     // create Directory Scan
-    path = [[dirGroup URLByAppendingPathComponent:k_appScan] path];
+    path = [[dirGroup URLByAppendingPathComponent:NCBrandGlobal.shared.appScan] path];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
     
@@ -972,58 +1004,29 @@
     
     // Directory Excluded From Backup
     [CCUtility addSkipBackupAttributeToItemAtURL:[[[NSFileManager defaultManager] URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject]];
-    [CCUtility addSkipBackupAttributeToItemAtURL:[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_DirectoryProviderStorage]];
-    [CCUtility addSkipBackupAttributeToItemAtURL:[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_appUserData]];
+    [CCUtility addSkipBackupAttributeToItemAtURL:[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.directoryProviderStorage]];
+    [CCUtility addSkipBackupAttributeToItemAtURL:[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.appUserData]];
     
-#ifdef DEBUG
+    #ifdef DEBUG
     NSLog(@"[LOG] Copy DB on Documents directory");
-    NSString *atPathDB = [NSString stringWithFormat:@"%@/nextcloud.realm", [[dirGroup URLByAppendingPathComponent:k_appDatabaseNextcloud] path]];
+    NSString *atPathDB = [NSString stringWithFormat:@"%@/nextcloud.realm", [[dirGroup URLByAppendingPathComponent:[[NCBrandGlobal shared] appDatabaseNextcloud]] path]];
     NSString *toPathDB = [NSString stringWithFormat:@"%@/nextcloud.realm", [CCUtility getDirectoryDocuments]];
     [[NSFileManager defaultManager] removeItemAtPath:toPathDB error:nil];
     [[NSFileManager defaultManager] copyItemAtPath:atPathDB toPath:toPathDB error:nil];
-#endif
+    #endif
 }
 
 + (NSURL *)getDirectoryGroup
 {
-    NSURL *path = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:[NCBrandOptions sharedInstance].capabilitiesGroups];
+    NSURL *path = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:[NCBrandOptions shared].capabilitiesGroups];
     return path;
 }
 
-+ (NSString *)getHomeServerUrlActiveUrl:(NSString *)activeUrl
++ (NSString *)getStringUser:(NSString *)user urlBase:(NSString *)urlBase
 {
-    if (activeUrl == nil)
-        return @"";
-    
-    return [activeUrl stringByAppendingString:k_webDAV];
-}
-
-+ (NSString *)getStringUser:(NSString *)activeUser activeUrl:(NSString *)activeUrl
-{
-    NSString *baseUrl = [activeUrl lowercaseString];
+    NSString *baseUrl = [urlBase lowercaseString];
     NSString *dirUserBaseUrl = @"";
 
-    if ([activeUser length] && [baseUrl length]) {
-        
-        if ([baseUrl hasPrefix:@"https://"]) baseUrl = [baseUrl substringFromIndex:8];
-        if ([baseUrl hasPrefix:@"http://"]) baseUrl = [baseUrl substringFromIndex:7];
-        
-        dirUserBaseUrl = [NSString stringWithFormat:@"%@-%@", activeUser, baseUrl];
-        dirUserBaseUrl = [[self removeForbiddenCharactersFileSystem:dirUserBaseUrl] lowercaseString];
-    }
-    
-    return dirUserBaseUrl;
-}
-
-// Return path of User
-+ (NSString *)getDirectoryActiveUser:(NSString *)activeUser activeUrl:(NSString *)activeUrl
-{
-    NSURL *dirGroup = [CCUtility getDirectoryGroup];
-    NSString *user = activeUser;
-    NSString *baseUrl = [activeUrl lowercaseString];
-    NSString *dirUserBaseUrl = nil;
-    NSString *dirApplicationUserGroup = nil;
-    
     if ([user length] && [baseUrl length]) {
         
         if ([baseUrl hasPrefix:@"https://"]) baseUrl = [baseUrl substringFromIndex:8];
@@ -1031,15 +1034,8 @@
         
         dirUserBaseUrl = [NSString stringWithFormat:@"%@-%@", user, baseUrl];
         dirUserBaseUrl = [[self removeForbiddenCharactersFileSystem:dirUserBaseUrl] lowercaseString];
-    } else return @"";
-    
-    dirApplicationUserGroup = [[dirGroup URLByAppendingPathComponent:k_appApplicationSupport] path];
-    dirUserBaseUrl = [NSString stringWithFormat:@"%@/%@", dirApplicationUserGroup, dirUserBaseUrl];
-    
-    if (![[NSFileManager defaultManager] fileExistsAtPath: dirUserBaseUrl]) {
-        [[NSFileManager defaultManager] createDirectoryAtPath:dirUserBaseUrl withIntermediateDirectories:YES attributes:nil error:nil];
     }
-        
+    
     return dirUserBaseUrl;
 }
 
@@ -1069,7 +1065,7 @@
 // Return the path of directory Cetificates
 + (NSString *)getDirectoryCerificates
 {
-    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_appCertificates] path];
+    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.appCertificates] path];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
@@ -1079,7 +1075,7 @@
 
 + (NSString *)getDirectoryUserData
 {
-    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_appUserData] path];
+    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.appUserData] path];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
@@ -1089,7 +1085,7 @@
 
 + (NSString *)getDirectoryProviderStorage
 {
-    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_DirectoryProviderStorage] path];
+    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.directoryProviderStorage] path];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
@@ -1119,9 +1115,14 @@
     return fileNamePath;
 }
 
-+ (NSString *)getDirectoryProviderStorageIconOcId:(NSString *)ocId fileNameView:(NSString *)fileNameView
++ (NSString *)getDirectoryProviderStorageIconOcId:(NSString *)ocId etag:(NSString *)etag
 {
-    return [NSString stringWithFormat:@"%@/%@.ico", [self getDirectoryProviderStorageOcId:ocId], fileNameView];
+    return [NSString stringWithFormat:@"%@/%@.small.ico", [self getDirectoryProviderStorageOcId:ocId], etag];
+}
+
++ (NSString *)getDirectoryProviderStoragePreviewOcId:(NSString *)ocId etag:(NSString *)etag
+{
+    return [NSString stringWithFormat:@"%@/%@.preview.ico", [self getDirectoryProviderStorageOcId:ocId], etag];
 }
 
 + (BOOL)fileProviderStorageExists:(NSString *)ocId fileNameView:(NSString *)fileNameView
@@ -1134,43 +1135,62 @@
     else return false;
 }
 
-+ (BOOL)fileProviderStorageIconExists:(NSString *)ocId fileNameView:(NSString *)fileNameView
++ (int64_t)fileProviderStorageSize:(NSString *)ocId fileNameView:(NSString *)fileNameView
 {
-    NSString *fileNamePath = [self getDirectoryProviderStorageIconOcId:ocId fileNameView:fileNameView];
+    NSString *fileNamePath = [self getDirectoryProviderStorageOcId:ocId fileNameView:fileNameView];
     
-    unsigned long long fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:fileNamePath error:nil] fileSize];
+    int64_t fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:fileNamePath error:nil] fileSize];
     
-    if (fileSize > 0) return true;
+    return fileSize;
+}
+
++ (BOOL)fileProviderStoragePreviewIconExists:(NSString *)ocId etag:(NSString *)etag
+{
+    NSString *fileNamePathPreview = [self getDirectoryProviderStoragePreviewOcId:ocId etag:etag];
+    NSString *fileNamePathIcon = [self getDirectoryProviderStorageIconOcId:ocId etag:etag];
+    
+    unsigned long long fileSizePreview = [[[NSFileManager defaultManager] attributesOfItemAtPath:fileNamePathPreview error:nil] fileSize];
+    unsigned long long fileSizeIcon = [[[NSFileManager defaultManager] attributesOfItemAtPath:fileNamePathIcon error:nil] fileSize];
+    
+    if (fileSizePreview > 0 && fileSizeIcon > 0) return true;
     else return false;
 }
 
-+ (void)emptyGroupApplicationSupport
++ (void)removeGroupApplicationSupport
 {
     NSURL *dirGroup = [CCUtility getDirectoryGroup];
-    NSString *path = [[dirGroup URLByAppendingPathComponent:k_appApplicationSupport] path];
+    NSString *path = [[dirGroup URLByAppendingPathComponent:NCBrandGlobal.shared.appApplicationSupport] path];
     
     [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
-+ (void)emptyGroupLibraryDirectory
++ (void)removeGroupLibraryDirectory
 {
     [[NSFileManager defaultManager] removeItemAtPath:[CCUtility getDirectoryScan] error:nil];
     [[NSFileManager defaultManager] removeItemAtPath:[CCUtility getDirectoryUserData] error:nil];
 }
 
-+ (void)emptyGroupDirectoryProviderStorage
++ (void)removeGroupDirectoryProviderStorage
 {
     [[NSFileManager defaultManager] removeItemAtPath:[CCUtility getDirectoryProviderStorage] error:nil];
 }
 
-+ (void)emptyDocumentsDirectory
++ (void)removeDocumentsDirectory
 {
     [[NSFileManager defaultManager] removeItemAtPath:[CCUtility getDirectoryDocuments] error:nil];
 }
 
-+ (void)emptyTemporaryDirectory
++ (void)removeTemporaryDirectory
 {
     [[NSFileManager defaultManager] removeItemAtPath:NSTemporaryDirectory() error:nil];
+}
+
++ (void)emptyTemporaryDirectory
+{
+    NSArray* tmpDirectory = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:NSTemporaryDirectory() error:NULL];
+    for (NSString *file in tmpDirectory) {
+        [[NSFileManager defaultManager] removeItemAtPath:[NSString stringWithFormat:@"%@%@", NSTemporaryDirectory(), file] error:NULL];
+    }
 }
 
 + (NSString *)getTitleSectionDate:(NSDate *)date
@@ -1185,7 +1205,7 @@
         
     } else {
         
-        title = [NSDateFormatter localizedStringFromDate:date dateStyle:NSDateFormatterFullStyle timeStyle:0];
+        title = [NSDateFormatter localizedStringFromDate:date dateStyle:NSDateFormatterLongStyle timeStyle:0];
         
         if ([date isEqualToDate:[CCUtility datetimeWithOutTime:today]])
             title = [NSString stringWithFormat:NSLocalizedString(@"_today_", nil)];
@@ -1199,88 +1219,53 @@
 
 + (void)moveFileAtPath:(NSString *)atPath toPath:(NSString *)toPath
 {
-    if ([[NSFileManager defaultManager] fileExistsAtPath:atPath]) {
-        [[NSFileManager defaultManager] removeItemAtPath:toPath error:nil];
-        [[NSFileManager defaultManager] copyItemAtPath:atPath toPath:toPath error:nil];
-        [[NSFileManager defaultManager] removeItemAtPath:atPath error:nil];
-    }
+    [[NSFileManager defaultManager] removeItemAtPath:toPath error:nil];
+    [[NSFileManager defaultManager] copyItemAtPath:atPath toPath:toPath error:nil];
+    [[NSFileManager defaultManager] removeItemAtPath:atPath error:nil];
 }
 
 + (void)copyFileAtPath:(NSString *)atPath toPath:(NSString *)toPath
 {
-    if ([[NSFileManager defaultManager] fileExistsAtPath:atPath]) {
-        [[NSFileManager defaultManager] removeItemAtPath:toPath error:nil];
-        [[NSFileManager defaultManager] copyItemAtPath:atPath toPath:toPath error:nil];
-    }
+    [[NSFileManager defaultManager] removeItemAtPath:toPath error:nil];
+    [[NSFileManager defaultManager] copyItemAtPath:atPath toPath:toPath error:nil];
 }
 
 + (void)removeFileAtPath:(NSString *)atPath
 {
-    if ([[NSFileManager defaultManager] fileExistsAtPath:atPath]) {
-        [[NSFileManager defaultManager] removeItemAtPath:atPath error:nil];
-    }
+    [[NSFileManager defaultManager] removeItemAtPath:atPath error:nil];
 }
 
-+ (NSString *)deletingLastPathComponentFromServerUrl:(NSString *)serverUrl
++ (void)createDirectoryAtPath:(NSString *)atPath
 {
-    NSURL *url = [[NSURL URLWithString:[serverUrl stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLFragmentAllowedCharacterSet]]] URLByDeletingLastPathComponent];
-    NSString *pather = [[url absoluteString] stringByRemovingPercentEncoding];
-    
-    return [pather substringToIndex: [pather length] - 1];
+    [[NSFileManager defaultManager] createDirectoryAtPath:atPath withIntermediateDirectories:true attributes:nil error:nil];
 }
 
-+ (NSString *)firtsPathComponentFromServerUrl:(NSString *)serverUrl activeUrl:(NSString *)activeUrl
++ (NSString *)returnPathfromServerUrl:(NSString *)serverUrl urlBase:(NSString *)urlBase account:(NSString *)account
 {
-    NSString *firstPath = serverUrl;
-
-    NSURL *serverUrlURL = [NSURL URLWithString:[serverUrl stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLFragmentAllowedCharacterSet]]];
-    NSURL *activeUrlURL = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@/", [activeUrl stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLFragmentAllowedCharacterSet]], k_webDAV]];
-    
-    while ([[serverUrlURL absoluteString] isEqualToString:[activeUrlURL absoluteString]] == false) {
-        firstPath = [serverUrlURL absoluteString];
-        serverUrlURL = [serverUrlURL URLByDeletingLastPathComponent];
-    }
-    
-    if ([firstPath hasSuffix:@"/"]) firstPath = [firstPath substringToIndex:[firstPath length] - 1];
-    return firstPath;
-}
-
-+ (NSString *)getLastPathFromServerUrl:(NSString *)serverUrl activeUrl:(NSString *)activeUrl
-{
-    if ([serverUrl isEqualToString:activeUrl])
-        return @"";
-    
-    NSURL *serverUrlURL = [NSURL URLWithString:[serverUrl stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLFragmentAllowedCharacterSet]]];
-    NSString *fileName = [serverUrlURL lastPathComponent];
-
-    return fileName;
-}
-
-+ (NSString *)returnPathfromServerUrl:(NSString *)serverUrl activeUrl:(NSString *)activeUrl
-{
-    NSString *path = [serverUrl stringByReplacingOccurrencesOfString:[activeUrl stringByAppendingString:k_webDAV] withString:@""];
-    
+    NSString *homeServer = [[NCUtilityFileSystem shared] getHomeServerWithUrlBase:urlBase account:account];
+    NSString *path = [serverUrl stringByReplacingOccurrencesOfString:homeServer withString:@""];
     return path;
 }
                                        
-+ (NSString *)returnFileNamePathFromFileName:(NSString *)metadataFileName serverUrl:(NSString *)serverUrl activeUrl:(NSString *)activeUrl
++ (NSString *)returnFileNamePathFromFileName:(NSString *)metadataFileName serverUrl:(NSString *)serverUrl urlBase:(NSString *)urlBase account:(NSString *)account
 {
-    if (metadataFileName == nil || serverUrl == nil || activeUrl == nil) {
+    if (metadataFileName == nil || serverUrl == nil || urlBase == nil) {
         return @"";
     }
     
-    NSString *fileName = [NSString stringWithFormat:@"%@/%@", [serverUrl stringByReplacingOccurrencesOfString:[CCUtility getHomeServerUrlActiveUrl:activeUrl] withString:@""], metadataFileName];
+    NSString *homeServer = [[NCUtilityFileSystem shared] getHomeServerWithUrlBase:urlBase account:account];
+    NSString *fileName = [NSString stringWithFormat:@"%@/%@", [serverUrl stringByReplacingOccurrencesOfString:homeServer withString:@""], metadataFileName];
     
     if ([fileName hasPrefix:@"/"]) fileName = [fileName substringFromIndex:1];
     
     return fileName;
 }
 
-+ (NSArray *)createNameSubFolder:(PHFetchResult *)alassets
++ (NSArray *)createNameSubFolder:(NSArray *)assets
 {
     NSMutableOrderedSet *datesSubFolder = [NSMutableOrderedSet new];
     
-    for (PHAsset *asset in alassets) {
+    for (PHAsset *asset in assets) {
         
         NSDate *assetDate = asset.creationDate;
         
@@ -1298,13 +1283,6 @@
     }
     
     return (NSArray *)datesSubFolder;
-}
-
-+ (BOOL)isDocumentModifiableExtension:(NSString *)fileExtension
-{
-    // Use UPPERCASE extension :
-    
-    return [@[@"TXT", @"MD", @"MARKDOWN", @"ORG"] containsObject:fileExtension];
 }
 
 + (NSString *)getMimeType:(NSString *)fileNameView
@@ -1333,7 +1311,7 @@
 
 + (NSString *)getDirectoryScan
 {
-    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:k_appScan] path];
+    NSString *path = [[[CCUtility getDirectoryGroup] URLByAppendingPathComponent:NCBrandGlobal.shared.appScan] path];
     
     if (![[NSFileManager defaultManager] fileExistsAtPath:path])
         [[NSFileManager defaultManager] createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
@@ -1341,29 +1319,175 @@
     return path;
 }
 
-+ (void)writeData:(NSData *)data fileNamePath:(NSString *)fileNamePath
++ (void)extractImageVideoFromAssetLocalIdentifierForUpload:(tableMetadata *)metadataForUpload notification:(BOOL)notification completion:(void(^)(tableMetadata *metadata, NSString* fileNamePath))completion
 {
-    [data writeToFile:fileNamePath atomically:YES];
-}
-
-+ (void)selectFileNameFrom:(UITextField *)textField
-{
-    UITextPosition *endPosition;
-    NSRange rangeDot = [textField.text rangeOfString:@"." options:NSBackwardsSearch];
-    
-    if (rangeDot.location != NSNotFound) {
-        endPosition = [textField positionFromPosition:textField.beginningOfDocument offset:rangeDot.location];
-    } else {
-        endPosition = textField.endOfDocument;
+    if (metadataForUpload == nil) {
+        completion(nil, nil);
+        return;
     }
     
-    UITextRange *textRange = [textField textRangeFromPosition:textField.beginningOfDocument toPosition:endPosition];
-    textField.selectedTextRange = textRange;
+    tableMetadata *metadata = [[NCManageDatabase shared] copyObjectWithMetadata:metadataForUpload];
+    
+    PHFetchResult *result = [PHAsset fetchAssetsWithLocalIdentifiers:@[metadata.assetLocalIdentifier] options:nil];
+    if (!result.count) {
+        if (notification) {
+            [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:NCBrandGlobal.shared.notificationCenterUploadedFile object:nil userInfo:@{@"ocId": metadata.ocId, @"errorCode": @(NCBrandGlobal.shared.ErrorInternalError), @"errorDescription": @"_err_asset_not_found_"}];
+        }
+        
+        completion(nil, nil);
+        return;
+    }
+    
+    PHAsset *asset = result[0];
+    NSDate *creationDate = asset.creationDate;
+    NSDate *modificationDate = asset.modificationDate;
+    NSArray *resourceArray = [PHAssetResource assetResourcesForAsset:asset];
+    long fileSize = [[resourceArray.firstObject valueForKey:@"fileSize"] longValue];
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    
+        // IMAGE
+        if (asset.mediaType == PHAssetMediaTypeImage) {
+            
+            PHImageRequestOptions *options = [PHImageRequestOptions new];
+            options.networkAccessAllowed = YES;
+            options.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+            options.synchronous = YES;
+            options.progressHandler = ^(double progress, NSError *error, BOOL *stop, NSDictionary *info) {
+                
+                NSLog(@"cacheAsset: %f", progress);
+                
+                if (error) {
+                    if (notification) {
+                        [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:NCBrandGlobal.shared.notificationCenterUploadedFile object:nil userInfo:@{@"ocId": metadata.ocId, @"errorCode": @(error.code), @"errorDescription": [NSString stringWithFormat:@"Image request iCloud failed [%@]", error.description]}];
+                    }
+                    
+                    completion(nil, nil);
+                    return;
+                }
+            };
+            
+            [[PHImageManager defaultManager] requestImageDataForAsset:asset options:options resultHandler:^(NSData *imageData, NSString *dataUTI, UIImageOrientation orientation, NSDictionary *info) {
+                
+                NSError *error = nil;
+                NSString *extensionAsset = [[[asset valueForKey:@"filename"] pathExtension] uppercaseString];
+                NSString *fileName = metadata.fileNameView;
+
+                if ([extensionAsset isEqualToString:@"HEIC"] && [CCUtility getFormatCompatibility]) {
+                    
+                    CIImage *ciImage = [CIImage imageWithData:imageData];
+                    CIContext *context = [CIContext context];
+                    imageData = [context JPEGRepresentationOfImage:ciImage colorSpace:ciImage.colorSpace options:@{}];
+                    
+                    NSString *fileNameJPEG = [[metadata.fileName lastPathComponent] stringByDeletingPathExtension];
+                    fileName = [fileNameJPEG stringByAppendingString:@".jpg"];
+                    metadata.contentType = @"image/jpeg";
+                }
+                
+                NSString *fileNamePath = [NSTemporaryDirectory() stringByAppendingString:fileName];
+                
+                [[NSFileManager defaultManager]removeItemAtPath:fileNamePath error:nil];
+                [imageData writeToFile:fileNamePath options:NSDataWritingAtomic error:&error];
+                
+                if (metadata.e2eEncrypted) {
+                    metadata.fileNameView = fileName;
+                } else {
+                    metadata.fileNameView = fileName;
+                    metadata.fileName = fileName;
+                }
+                     
+                metadata.creationDate = creationDate;
+                metadata.date = modificationDate;
+                metadata.size = fileSize;
+                
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(metadata, fileNamePath);
+                });
+            }];
+        }
+    
+        // VIDEO
+        if (asset.mediaType == PHAssetMediaTypeVideo) {
+            
+            PHVideoRequestOptions *options = [PHVideoRequestOptions new];
+            options.networkAccessAllowed = YES;
+            options.version = PHVideoRequestOptionsVersionOriginal;
+            options.progressHandler = ^(double progress, NSError *error, BOOL *stop, NSDictionary *info) {
+                
+                NSLog(@"cacheAsset: %f", progress);
+                
+                if (error) {
+                    if (notification) {
+                        [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:NCBrandGlobal.shared.notificationCenterUploadedFile object:nil userInfo:@{@"ocId": metadata.ocId, @"errorCode": @(error.code), @"errorDescription": [NSString stringWithFormat:@"Video request iCloud failed [%@]", error.description]}];
+                    }
+                    
+                    completion(nil, nil);
+                }
+            };
+            
+            [[PHImageManager defaultManager] requestAVAssetForVideo:asset options:options resultHandler:^(AVAsset *asset, AVAudioMix *audioMix, NSDictionary *info) {
+                
+                if ([asset isKindOfClass:[AVURLAsset class]]) {
+                    
+                    NSString *fileNamePath = [NSTemporaryDirectory() stringByAppendingString:metadata.fileNameView];
+                    NSURL *fileNamePathURL = [[NSURL alloc] initFileURLWithPath:fileNamePath];
+                    NSError *error = nil;
+                                       
+                    [[NSFileManager defaultManager] removeItemAtURL:fileNamePathURL error:nil];
+                    [[NSFileManager defaultManager] copyItemAtURL:[(AVURLAsset *)asset URL] toURL:fileNamePathURL error:&error];
+                        
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        
+                        if (error) {
+                            
+                            if (notification) {
+                                [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:NCBrandGlobal.shared.notificationCenterUploadedFile object:nil userInfo:@{@"ocId": metadata.ocId, @"errorCode": @(error.code), @"errorDescription": [NSString stringWithFormat:@"Video request iCloud failed [%@]", error.description]}];
+                            }
+                            
+                            completion(nil, nil);
+                            
+                        } else {
+                            
+                            metadata.creationDate = creationDate;
+                            metadata.date = modificationDate;
+                            metadata.size = fileSize;
+                            
+                            completion(metadata, fileNamePath);
+                        }
+                    });
+                }
+            }];
+        }
+    });
 }
 
-+ (NSString *)getTimeIntervalSince197
-{
-    return [NSString stringWithFormat:@"%f", [[NSDate date] timeIntervalSince1970]];
++ (void)extractLivePhotoAsset:(PHAsset*)asset filePath:(NSString *)filePath withCompletion:(void (^)(NSURL* url))completion
+{    
+    [CCUtility removeFileAtPath:filePath];
+    NSURL *fileUrl = [NSURL fileURLWithPath:filePath];
+    PHLivePhotoRequestOptions *options = [PHLivePhotoRequestOptions new];
+    options.deliveryMode = PHImageRequestOptionsDeliveryModeFastFormat;
+    options.networkAccessAllowed = YES;
+    
+    [[PHImageManager defaultManager] requestLivePhotoForAsset:asset targetSize:[UIScreen mainScreen].bounds.size contentMode:PHImageContentModeDefault options:options resultHandler:^(PHLivePhoto * _Nullable livePhoto, NSDictionary * _Nullable info) {
+        if (livePhoto) {
+            NSArray *assetResources = [PHAssetResource assetResourcesForLivePhoto:livePhoto];
+            PHAssetResource *videoResource = nil;
+            for(PHAssetResource *resource in assetResources){
+                if (resource.type == PHAssetResourceTypePairedVideo) {
+                    videoResource = resource;
+                    break;
+                }
+            }
+            if(videoResource){
+                [[PHAssetResourceManager defaultManager] writeDataForAssetResource:videoResource toFile:fileUrl options:nil completionHandler:^(NSError * _Nullable error) {
+                    if (!error) {
+                        completion(fileUrl);
+                    } else { completion(nil); }
+                }];
+            } else { completion(nil); }
+        } else { completion(nil); }
+    }];
 }
 
 #pragma --------------------------------------------------------------------------------------------
@@ -1377,273 +1501,276 @@
     return [[UUID stringByReplacingOccurrencesOfString:@"-" withString:@""] lowercaseString];
 }
 
-+ (BOOL)isFolderEncrypted:(NSString *)serverUrl account:(NSString *)account
++ (BOOL)isFolderEncrypted:(NSString *)serverUrl e2eEncrypted:(BOOL)e2eEncrypted account:(NSString *)account urlBase:(NSString *)urlBase
 {
-    BOOL depth = NO;
-    
-    if (depth) {
+    NSString *home = [[NCUtilityFileSystem shared] getHomeServerWithUrlBase:urlBase account:account];
         
-        NSArray *directories = [[NCManageDatabase sharedInstance] getTablesDirectoryWithPredicate:[NSPredicate predicateWithFormat:@"account == %@ AND e2eEncrypted == 1 AND serverUrl BEGINSWITH %@", account, serverUrl] sorted:@"serverUrl" ascending:false];
-        for (tableDirectory *directory in directories) {
-            if ([serverUrl containsString:directory.serverUrl])
+    if (e2eEncrypted) {
+    
+        return true;
+        
+    } else if ([serverUrl isEqualToString:home] || [serverUrl isEqualToString:@".."]) {
+        
+        return false;
+
+    } else {
+       
+        tableDirectory *directory = [[NCManageDatabase shared] getTableDirectoryWithPredicate:[NSPredicate predicateWithFormat:@"account == %@ AND serverUrl == %@", account, serverUrl]];
+        
+        while (directory != nil && ![directory.serverUrl isEqualToString:home]) {
+            if (directory.e2eEncrypted == true) {
                 return true;
+            }
+            serverUrl = [[NCUtilityFileSystem shared] deletingLastPathComponentWithServerUrl:serverUrl urlBase:urlBase account:account];
+            directory = [[NCManageDatabase shared] getTableDirectoryWithPredicate:[NSPredicate predicateWithFormat:@"account == %@ AND serverUrl == %@", account, serverUrl]];
         }
         
-    } else {
+        return false;
+    }
+}
+
+#pragma --------------------------------------------------------------------------------------------
+#pragma mark ===== Share Permissions =====
+#pragma --------------------------------------------------------------------------------------------
+
++ (NSInteger) getPermissionsValueByCanEdit:(BOOL)canEdit andCanCreate:(BOOL)canCreate andCanChange:(BOOL)canChange andCanDelete:(BOOL)canDelete andCanShare:(BOOL)canShare andIsFolder:(BOOL) isFolder
+{    
+    NSInteger permissionsValue = NCBrandGlobal.shared.permissionReadShare;
+    
+    if (canEdit && !isFolder) {
+        permissionsValue = permissionsValue + NCBrandGlobal.shared.permissionUpdateShare;
+    }
+    if (canCreate & isFolder) {
+        permissionsValue = permissionsValue + NCBrandGlobal.shared.permissionCreateShare;
+    }
+    if (canChange && isFolder) {
+        permissionsValue = permissionsValue + NCBrandGlobal.shared.permissionUpdateShare;
+    }
+    if (canDelete & isFolder) {
+        permissionsValue = permissionsValue + NCBrandGlobal.shared.permissionDeleteShare;
+    }
+    if (canShare) {
+        permissionsValue = permissionsValue + NCBrandGlobal.shared.permissionShareShare;
+    }
+    
+    return permissionsValue;
+}
+
++ (BOOL) isPermissionToCanCreate:(NSInteger) permissionValue {
+    BOOL canCreate = ((permissionValue & NCBrandGlobal.shared.permissionCreateShare) > 0);
+    return canCreate;
+}
+
++ (BOOL) isPermissionToCanChange:(NSInteger) permissionValue {
+    BOOL canChange = ((permissionValue & NCBrandGlobal.shared.permissionUpdateShare) > 0);
+    return canChange;
+}
+
++ (BOOL) isPermissionToCanDelete:(NSInteger) permissionValue {
+    BOOL canDelete = ((permissionValue & NCBrandGlobal.shared.permissionDeleteShare) > 0);
+    return canDelete;
+}
+
++ (BOOL) isPermissionToCanShare:(NSInteger) permissionValue {
+    BOOL canShare = ((permissionValue & NCBrandGlobal.shared.permissionShareShare) > 0);
+    return canShare;
+}
+
++ (BOOL) isAnyPermissionToEdit:(NSInteger) permissionValue {
+    
+    BOOL canCreate = [self isPermissionToCanCreate:permissionValue];
+    BOOL canChange = [self isPermissionToCanChange:permissionValue];
+    BOOL canDelete = [self isPermissionToCanDelete:permissionValue];
+    
+    
+    BOOL canEdit = (canCreate || canChange || canDelete);
+    
+    return canEdit;
+    
+}
+
++ (BOOL) isPermissionToRead:(NSInteger) permissionValue {
+    BOOL canRead = ((permissionValue & NCBrandGlobal.shared.permissionReadShare) > 0);
+    return canRead;
+}
+
++ (BOOL) isPermissionToReadCreateUpdate:(NSInteger) permissionValue {
+    
+    BOOL canRead   = [self isPermissionToRead:permissionValue];
+    BOOL canCreate = [self isPermissionToCanCreate:permissionValue];
+    BOOL canChange = [self isPermissionToCanChange:permissionValue];
+    
+    
+    BOOL canEdit = (canCreate && canChange && canRead);
+    
+    return canEdit;
+    
+}
+
+#pragma --------------------------------------------------------------------------------------------
+#pragma mark ===== EXIF =====
+#pragma --------------------------------------------------------------------------------------------
+
++ (void)setExif:(tableMetadata *)metadata withCompletionHandler:(void(^)(double latitude, double longitude, NSString *location, NSDate *date, NSString *lensModel))completition
+{
+    NSString *dateTime;
+    NSString *latitudeRef;
+    NSString *longitudeRef;
+    NSString *stringLatitude = @"0";
+    NSString *stringLongitude = @"0";
+    __block NSString *location = @"";
+    
+    double latitude = 0;
+    double longitude = 0;
+    
+    NSDate *date = [NSDate new];
+    long fileSize = 0;
+    int pixelY = 0;
+    int pixelX = 0;
+    NSString *lensModel;
+
+    if (![metadata.typeFile isEqualToString:NCBrandGlobal.shared.metadataTypeFileImage] || ![CCUtility fileProviderStorageExists:metadata.ocId fileNameView:metadata.fileNameView]) {
+        completition(latitude, longitude, location, date, lensModel);
+        return;
+    }
+    
+    NSURL *url = [NSURL fileURLWithPath:[CCUtility getDirectoryProviderStorageOcId:metadata.ocId fileNameView:metadata.fileNameView]];
+    CGImageSourceRef originalSource =  CGImageSourceCreateWithURL((CFURLRef) url, NULL);
+    if (!originalSource) {
+        completition(latitude, longitude, location, date, lensModel);
+        return;
+    }
+    
+    CFDictionaryRef fileProperties = CGImageSourceCopyProperties(originalSource, nil);
+    if (!fileProperties) {
+        completition(latitude, longitude, location,date, lensModel);
+        return;
+    }
+    
+    // FILES PROPERTIES
+    NSNumber *fileSizeNumber = CFDictionaryGetValue(fileProperties, kCGImagePropertyFileSize);
+    fileSize = [fileSizeNumber longValue];
+    
+    
+    CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(originalSource, 0, NULL);
+    if (!imageProperties) {
+        completition(latitude, longitude, location,date, lensModel);
+        return;
+    }
+
+    CFDictionaryRef tiff = CFDictionaryGetValue(imageProperties, kCGImagePropertyTIFFDictionary);
+    CFDictionaryRef gps = CFDictionaryGetValue(imageProperties, kCGImagePropertyGPSDictionary);
+    CFDictionaryRef exif = CFDictionaryGetValue(imageProperties, kCGImagePropertyExifDictionary);
+    
+    if (exif) {
         
-        tableDirectory *directory = [[NCManageDatabase sharedInstance] getTableDirectoryWithPredicate:[NSPredicate predicateWithFormat:@"account == %@ AND e2eEncrypted == 1 AND serverUrl == %@", account, serverUrl]];
-        if (directory != nil)
-            return true;
+        NSString *sPixelX = (NSString *)CFDictionaryGetValue(exif, kCGImagePropertyExifPixelXDimension);
+        pixelX = [sPixelX intValue];
+        NSString *sPixelY = (NSString *)CFDictionaryGetValue(exif, kCGImagePropertyExifPixelYDimension);
+        pixelY = [sPixelY intValue];
+        lensModel = (NSString *)CFDictionaryGetValue(exif, kCGImagePropertyExifLensModel);
     }
-    
-    return false;
-}
-
-#pragma --------------------------------------------------------------------------------------------
-#pragma mark ===== CCMetadata =====
-#pragma --------------------------------------------------------------------------------------------
-
-+ (tableMetadata *)createMetadataWithAccount:(NSString *)account date:(NSDate *)date directory:(BOOL)directory ocId:(NSString *)ocId serverUrl:(NSString *)serverUrl fileName:(NSString *)fileName etag:(NSString *)etag size:(double)size status:(double)status url:(NSString *)url
-{
-    tableMetadata *metadata = [tableMetadata new];
-    
-    metadata.account = account;
-    metadata.date = date;
-    metadata.directory = directory;
-    metadata.etag = etag;
-    metadata.ocId = ocId;
-    metadata.fileName = fileName;
-    metadata.fileNameView = fileName;
-    metadata.serverUrl = serverUrl;
-    metadata.size = size;
-    metadata.status = status;
-    metadata.url = url;
-    
-    [self insertTypeFileIconName:fileName metadata:metadata];
-    
-    return metadata;
-}
-
-+ (tableMetadata *)trasformedOCFileToCCMetadata:(OCFileDto *)itemDto fileName:(NSString *)fileName serverUrl:(NSString *)serverUrl autoUploadFileName:(NSString *)autoUploadFileName autoUploadDirectory:(NSString *)autoUploadDirectory account:(NSString *)account isFolderEncrypted:(BOOL)isFolderEncrypted
-{
-    tableMetadata *metadata = [tableMetadata new];
-    NSString *fileNameView;
-    
-    fileName = [CCUtility removeForbiddenCharactersServer:fileName];
-    fileNameView = fileName;
-    
-    // E2EE find the fileName for fileNameView
-    if (isFolderEncrypted) {
-        tableE2eEncryption *tableE2eEncryption = [[NCManageDatabase sharedInstance] getE2eEncryptionWithPredicate:[NSPredicate predicateWithFormat:@"account == %@ AND serverUrl == %@ AND fileNameIdentifier == %@", account, serverUrl, fileName]];
-        if (tableE2eEncryption)
-            fileNameView = tableE2eEncryption.fileName;
-    }
-    
-    metadata.account = account;
-    metadata.commentsUnread = itemDto.commentsUnread;
-    metadata.contentType = itemDto.contentType;
-    metadata.date = [NSDate dateWithTimeIntervalSince1970:itemDto.date];
-    metadata.directory = itemDto.isDirectory;
-    metadata.e2eEncrypted = itemDto.isEncrypted;
-    metadata.etag = itemDto.etag;
-    metadata.fileId = itemDto.fileId;
-    metadata.favorite = itemDto.isFavorite;
-    metadata.fileName = fileName;
-    metadata.fileNameView = fileNameView;
-    metadata.hasPreview = itemDto.hasPreview;
-    metadata.iconName = @"";
-    metadata.mountType = itemDto.mountType;
-    metadata.ocId = itemDto.ocId;
-    metadata.ownerId = itemDto.ownerId;
-    metadata.ownerDisplayName = itemDto.ownerDisplayName;
-    metadata.permissions = itemDto.permissions;
-    metadata.quotaUsedBytes = itemDto.quotaUsedBytes;
-    metadata.quotaAvailableBytes = itemDto.quotaAvailableBytes;
-    metadata.resourceType = itemDto.resourceType;
-    metadata.serverUrl = serverUrl;
-    metadata.sessionTaskIdentifier = k_taskIdentifierDone;
-    metadata.size = itemDto.size;
-    metadata.status = k_metadataStatusNormal;
-    metadata.typeFile = @"";
-    metadata.trashbinFileName = itemDto.trashbinFileName;
-    metadata.trashbinOriginalLocation = itemDto.trashbinOriginalLocation;
-    metadata.trashbinDeletionTime = [NSDate dateWithTimeIntervalSince1970:itemDto.trashbinDeletionTime];
-    
-    [self insertTypeFileIconName:fileNameView metadata:metadata];
  
-    return metadata;
-}
-
-+ (NSString *)insertTypeFileIconName:(NSString *)fileNameView metadata:(tableMetadata *)metadata
-{
-    CFStringRef fileUTI = nil;
-    NSString *returnFileUTI = nil;
+    if (tiff) {
+        
+        dateTime = (NSString *)CFDictionaryGetValue(tiff, kCGImagePropertyTIFFDateTime);
+        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+        [dateFormatter setDateFormat:@"yyyy:MM:dd HH:mm:ss"];
+        date = [dateFormatter dateFromString:dateTime];
+        if (!date) date = metadata.date;
+    }
     
-    if ([fileNameView isEqualToString:@"."]) {
+    if (gps) {
         
-        metadata.typeFile = k_metadataTypeFile_unknown;
-        metadata.iconName = @"file";
+        latitude = [(NSString *)CFDictionaryGetValue(gps, kCGImagePropertyGPSLatitude) doubleValue];
+        longitude = [(NSString *)CFDictionaryGetValue(gps, kCGImagePropertyGPSLongitude) doubleValue];
         
-    } else if (metadata.directory) {
+        latitudeRef = (NSString *)CFDictionaryGetValue(gps, kCGImagePropertyGPSLatitudeRef);
+        longitudeRef = (NSString *)CFDictionaryGetValue(gps, kCGImagePropertyGPSLongitudeRef);
         
-        metadata.typeFile = k_metadataTypeFile_directory;
-        fileUTI = kUTTypeFolder;
-        
-    } else {
-        
-        CFStringRef fileExtension = (__bridge CFStringRef)[fileNameView pathExtension];
-        NSString *ext = (__bridge NSString *)fileExtension;
-        ext = ext.uppercaseString;
-        fileUTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, fileExtension, NULL);
-
-        // Type image
-        if (UTTypeConformsTo(fileUTI, kUTTypeImage)) {
-            metadata.typeFile = k_metadataTypeFile_image;
-            metadata.iconName = @"file_photo";
-        }
-        // Type Video
-        else if (UTTypeConformsTo(fileUTI, kUTTypeMovie)) {
-            metadata.typeFile = k_metadataTypeFile_video;
-            metadata.iconName = @"file_movie";
-        }
-        // Type Audio
-        else if (UTTypeConformsTo(fileUTI, kUTTypeAudio)) {
-            metadata.typeFile = k_metadataTypeFile_audio;
-            metadata.iconName = @"file_audio";
-        }
-        // Type Document [DOC] [PDF] [XLS] [TXT] (RTF = "public.rtf" - ODT = "org.oasis-open.opendocument.text") + isDocumentModifiableExtension
-        else if (UTTypeConformsTo(fileUTI, kUTTypeContent) || [CCUtility isDocumentModifiableExtension:ext]) {
-            
-            metadata.typeFile = k_metadataTypeFile_document;
-            metadata.iconName = @"document";
-            
-            NSString *typeFile = (__bridge NSString *)fileUTI;
-            
-            if ([typeFile isEqualToString:@"com.adobe.pdf"]) {
-                metadata.iconName = @"file_pdf";
-            }
-            
-            if ([typeFile isEqualToString:@"org.openxmlformats.spreadsheetml.sheet"]) {
-                metadata.iconName = @"file_xls";
-            }
-            
-            if ([typeFile isEqualToString:@"com.microsoft.excel.xls"]) {
-                metadata.iconName = @"file_xls";
-            }
-            
-            if ([typeFile isEqualToString:@"public.plain-text"] || [CCUtility isDocumentModifiableExtension:ext]) {
-                metadata.iconName = @"file_txt";
-            }
-            
-            if ([typeFile isEqualToString:@"public.html"]) {
-                metadata.iconName = @"file_code";
-            }
-        }
-        // Type compress
-        else if (UTTypeConformsTo(fileUTI, kUTTypeZipArchive) && [(__bridge NSString *)fileUTI containsString:@"org.openxmlformats"] == NO && [(__bridge NSString *)fileUTI containsString:@"oasis"] == NO) {
-            metadata.typeFile = k_metadataTypeFile_compress;
-            metadata.iconName = @"file_compress";
+        // conversion 4 decimal +N -S
+        // The latitude in degrees. Positive values indicate latitudes north of the equator. Negative values indicate latitudes south of the equator.
+        if ([latitudeRef isEqualToString:@"N"]) {
+            stringLatitude = [NSString stringWithFormat:@"+%.4f", latitude];
         } else {
+            stringLatitude = [NSString stringWithFormat:@"-%.4f", latitude];
+        }
+        
+        // conversion 4 decimal +E -W
+        // The longitude in degrees. Measurements are relative to the zero meridian, with positive values extending east of the meridian
+        // and negative values extending west of the meridian.
+        if ([longitudeRef isEqualToString:@"E"]) {
+            stringLongitude = [NSString stringWithFormat:@"+%.4f", longitude];
+        } else {
+            stringLongitude = [NSString stringWithFormat:@"-%.4f", longitude];
+        }
+        
+        if (latitude == 0 || longitude == 0) {
             
-            // Type unknown
-            metadata.typeFile = k_metadataTypeFile_unknown;
-            
-            // icon uTorrent
-            if ([ext isEqualToString:@"TORRENT"]) {
-                
-                metadata.iconName = @"utorrent";
-                
-            } else if ([ext isEqualToString:@"IMI"]) {
-                
-                metadata.typeFile = k_metadataTypeFile_imagemeter;
-                metadata.iconName = @"imagemeter";
-            
-            } else {
-            
-                metadata.iconName = @"file";
-            }
+            stringLatitude = @"0";
+            stringLongitude = @"0";
         }
     }
-    
-    if (fileUTI != nil) {
-        returnFileUTI = (__bridge NSString *)fileUTI;
-        CFRelease(fileUTI);
-    }
-    
-    return returnFileUTI;
-}
 
-+ (tableMetadata *)insertFileSystemInMetadata:(tableMetadata *)metadata
-{
-    NSString *fileNamePath = [CCUtility getDirectoryProviderStorageOcId:metadata.ocId fileNameView:metadata.fileName];
-    
-    NSDictionary *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:fileNamePath error:nil];
-    
-    if (attributes[NSFileModificationDate]) {
-        metadata.date = attributes[NSFileModificationDate];
+    // Wite data EXIF in DB
+    if (tiff || gps) {
+        [[NCManageDatabase shared] setLocalFileWithOcId:metadata.ocId exifDate:date exifLatitude:stringLatitude exifLongitude:stringLongitude exifLensModel:lensModel];
+        if ([stringLatitude doubleValue] != 0 || [stringLongitude doubleValue] != 0) {
+            
+            // If exists already geocoder data in TableGPS exit
+            location = [[NCManageDatabase shared] getLocationFromGeoLatitude:stringLatitude longitude:stringLongitude];
+            if (location != nil) {
+                completition(latitude, longitude, location, date, lensModel);
+                return;
+            }
+            
+            CLGeocoder *geocoder = [[CLGeocoder alloc] init];
+            CLLocation *llocation = [[CLLocation alloc] initWithLatitude:latitude longitude:longitude];
+            
+            [geocoder reverseGeocodeLocation:llocation completionHandler:^(NSArray *placemarks, NSError *error) {
+                        
+                if (error == nil && [placemarks count] > 0) {
+                    
+                    CLPlacemark *placemark = [placemarks lastObject];
+                    
+                    NSString *thoroughfare = @"";
+                    NSString *postalCode = @"";
+                    NSString *locality = @"";
+                    NSString *administrativeArea = @"";
+                    NSString *country = @"";
+                    
+                    if (placemark.thoroughfare) thoroughfare = placemark.thoroughfare;
+                    if (placemark.postalCode) postalCode = placemark.postalCode;
+                    if (placemark.locality) locality = placemark.locality;
+                    if (placemark.administrativeArea) administrativeArea = placemark.administrativeArea;
+                    if (placemark.country) country = placemark.country;
+                    
+                    location = [NSString stringWithFormat:@"%@ %@ %@ %@ %@", thoroughfare, postalCode, locality, administrativeArea, country];
+                    location = [location stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+                    
+                    // GPS
+                    if ([location length] > 0) {
+                        
+                        [[NCManageDatabase shared] addGeocoderLocation:location placemarkAdministrativeArea:placemark.administrativeArea placemarkCountry:placemark.country placemarkLocality:placemark.locality placemarkPostalCode:placemark.postalCode placemarkThoroughfare:placemark.thoroughfare latitude:stringLatitude longitude:stringLongitude];
+                    }
+                    
+                    completition(latitude, longitude, location, date, lensModel);
+                }
+            }];
+        } else {
+            completition(latitude, longitude, location, date, lensModel);
+        }
     } else {
-        metadata.date = [NSDate date];
+        completition(latitude, longitude, location, date, lensModel);
     }
-    metadata.size = [attributes[NSFileSize] longValue];
-    
-    [self insertTypeFileIconName:metadata.fileNameView metadata:metadata];
-    
-    return metadata;
-}
-
-+ (NSString *)createMetadataIDFromAccount:(NSString *)account serverUrl:(NSString *)serverUrl fileNameView:(NSString *)fileNameView directory:(BOOL)directory
-{
-    NSArray *arrayForbiddenCharacters = [NSArray arrayWithObjects:@"\\",@"<",@">",@":",@"\"",@"|",@"?",@"*",@"/", nil];
-    
-    for (NSString *currentCharacter in arrayForbiddenCharacters) {
-        account = [account stringByReplacingOccurrencesOfString:currentCharacter withString:@""];
-    }
-    
-    for (NSString *currentCharacter in arrayForbiddenCharacters) {
-        serverUrl = [serverUrl stringByReplacingOccurrencesOfString:currentCharacter withString:@""];
-    }
-    
-    NSString *uniqueID = [[account stringByAppendingString:serverUrl] lowercaseString];
-    NSString *metadataID =  [[uniqueID stringByAppendingString:fileNameView] lowercaseString];
-    
-    if (directory) {
-        return [metadataID stringByAppendingString:@"-dir"];
-    }
-    
-    return metadataID;
+       
+    CFRelease(originalSource);
+    CFRelease(imageProperties);
 }
 
 #pragma --------------------------------------------------------------------------------------------
 #pragma mark ===== Third parts =====
 #pragma --------------------------------------------------------------------------------------------
-
-+ (NSString *)stringValueForKey:(id)key conDictionary:(NSDictionary *)dictionary
-{
-    id obj = [dictionary objectForKey:key];
-    
-    if ([obj isEqual:[NSNull null]]) return @"";
-    
-    if ([obj isKindOfClass:[NSString class]]) {
-        return obj;
-    }
-    else if ([obj isKindOfClass:[NSNumber class]]) {
-        return [obj stringValue];
-    }
-    else {
-        return [obj description];
-    }
-}
-
-+ (NSString *)currentDevice
-{
-    struct utsname systemInfo;
-    uname(&systemInfo);
-    
-    NSString *deviceName=[NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding];
-    //NSLog(@"[LOG] Device Name :%@",deviceName);
-    
-    return deviceName;
-}
 
 + (NSString *)getExtension:(NSString*)fileName
 {
@@ -1663,28 +1790,6 @@
     return extension;
 }
 
-/*
- * Util method to make a NSDate object from a string from xml
- * @dateString -> Data string from xml
- */
-+ (NSDate*)parseDateString:(NSString*)dateString
-{
-    //Parse the date in all the formats
-    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-    /*In most cases the best locale to choose is "en_US_POSIX", a locale that's specifically designed to yield US English results regardless of both user and system preferences. "en_US_POSIX" is also invariant in time (if the US, at some point in the future, changes the way it formats dates, "en_US" will change to reflect the new behaviour, but "en_US_POSIX" will not). It will behave consistently for all users.*/
-    [dateFormatter setLocale:[[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"]];
-    //This is the format for the concret locale used
-    [dateFormatter setDateFormat:@"EEE, dd MMM y HH:mm:ss zzz"];
-    
-    NSDate *theDate = nil;
-    NSError *error = nil;
-    if (![dateFormatter getObjectValue:&theDate forString:dateString range:nil error:&error]) {
-        NSLog(@"[LOG] Date '%@' could not be parsed: %@", dateString, error);
-    }
-    
-    return theDate;
-}
-
 + (NSDate *)datetimeWithOutTime:(NSDate *)datDate
 {
     if (datDate == nil) return nil;
@@ -1693,60 +1798,6 @@
     datDate = [[NSCalendar currentCalendar] dateFromComponents:comps];
     
     return datDate;
-}
-
-+ (NSDate *)datetimeWithOutDate:(NSDate *)datDate
-{
-    if (datDate == nil) return nil;
-    
-    NSDateComponents* comps = [[NSCalendar currentCalendar] components:NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:datDate];
-    return [[NSCalendar currentCalendar] dateFromComponents:comps];
-}
-
-+ (BOOL)isValidEmail:(NSString *)checkString
-{
-    checkString = [checkString lowercaseString];
-    BOOL stricterFilter = YES;
-    NSString *stricterFilterString = @"[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,4}";
-    NSString *laxString = @".+@.+\\.[A-Za-z]{2}[A-Za-z]*";
-    
-    NSString *emailRegex = stricterFilter ? stricterFilterString : laxString;
-    NSPredicate *emailTest = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", emailRegex];
-    
-    return [emailTest evaluateWithObject:checkString];
-}
-
-+ (NSString *)URLEncodeStringFromString:(NSString *)string
-{
-    static CFStringRef charset = CFSTR("!@#$%&*()+'\";:=,/?[] ");
-    CFStringRef str = (__bridge CFStringRef)string;
-    CFStringEncoding encoding = kCFStringEncodingUTF8;
-    return (NSString *)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(NULL, str, NULL, charset, encoding));
-}
-
-+ (NSString*)hexRepresentation:(NSData *)data spaces:(BOOL)spaces
-{
-    const unsigned char* bytes = (const unsigned char*)[data bytes];
-    NSUInteger nbBytes = [data length];
-    //If spaces is true, insert a space every this many input bytes (twice this many output characters).
-    static const NSUInteger spaceEveryThisManyBytes = 4UL;
-    //If spaces is true, insert a line-break instead of a space every this many spaces.
-    static const NSUInteger lineBreakEveryThisManySpaces = 4UL;
-    const NSUInteger lineBreakEveryThisManyBytes = spaceEveryThisManyBytes * lineBreakEveryThisManySpaces;
-    NSUInteger strLen = 2*nbBytes + (spaces ? nbBytes/spaceEveryThisManyBytes : 0);
-    
-    NSMutableString* hex = [[NSMutableString alloc] initWithCapacity:strLen];
-    for(NSUInteger i=0; i<nbBytes; ) {
-        [hex appendFormat:@"%02X", bytes[i]];
-        //We need to increment here so that the every-n-bytes computations are right.
-        ++i;
-        
-        if (spaces) {
-            if (i % lineBreakEveryThisManyBytes == 0) [hex appendString:@"\n"];
-            else if (i % spaceEveryThisManyBytes == 0) [hex appendString:@" "];
-        }
-    }
-    return hex;
 }
 
 + (NSString *)valueForKey:(NSString *)key fromQueryItems:(NSArray *)queryItems

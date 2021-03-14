@@ -21,14 +21,11 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import "XLFormViewController.h"
-#import "XLForm.h"
-#import "BKPasscodeViewController.h"
-#import "OCNetworking.h"
+#import <XLForm/XLForm.h>
 
 @class NCEndToEndInitialize;
 
-@interface NCManageEndToEndEncryption : XLFormViewController <BKPasscodeViewControllerDelegate>
+@interface NCManageEndToEndEncryption : XLFormViewController
 
 @property (nonatomic, strong) NCEndToEndInitialize *endToEndInitialize;
 

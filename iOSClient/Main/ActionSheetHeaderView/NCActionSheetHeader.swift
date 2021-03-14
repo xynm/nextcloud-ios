@@ -25,35 +25,35 @@ import Foundation
 
 class NCActionSheetHeader: NSObject {
     
-    @objc static let sharedInstance: NCActionSheetHeader = {
+    @objc static let shared: NCActionSheetHeader = {
         let instance = NCActionSheetHeader()
         return instance
     }()
     
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
 
-    func actionSheetHeader(isDirectory: Bool, iconName: String, ocId: String, fileNameView: String, text: String) -> UIView? {
+    func actionSheetHeader(isDirectory: Bool, iconName: String, ocId: String, etag: String, text: String) -> UIView? {
         
         var image: UIImage?
         
         // Header
         if isDirectory {
-            image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
+            image = UIImage.init(named: "folder")?.image(color: NCBrandColor.shared.brandElement, size: UIScreen.main.bounds.width)
         } else if iconName.count > 0 {
             image = UIImage.init(named: iconName)
         } else {
             image = UIImage.init(named: "file")
         }
-        if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(ocId, fileNameView: fileNameView)) {
-            image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconOcId(ocId, fileNameView: fileNameView))
+        if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(ocId, etag: etag)) {
+            image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconOcId(ocId, etag: etag))
         }
         
         let headerView = UINib(nibName: "NCActionSheetHeaderView", bundle: nil).instantiate(withOwner: self, options: nil).first as! NCActionSheetHeaderView
         
-        headerView.backgroundColor = NCBrandColor.sharedInstance.backgroundForm
+        headerView.backgroundColor = NCBrandColor.shared.backgroundForm
         headerView.imageItem.image = image
         headerView.label.text = text
-        headerView.label.textColor = NCBrandColor.sharedInstance.icon
+        headerView.label.textColor = NCBrandColor.shared.icon
         
         return headerView
     }

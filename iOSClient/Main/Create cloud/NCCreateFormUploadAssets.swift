@@ -22,17 +22,18 @@
 //
 
 import Foundation
+import Queuer
 
 @objc protocol createFormUploadAssetsDelegate {
     
     func dismissFormUploadAssets()
 }
 
-class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEditorDelegate {
+class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
     
     var serverUrl: String = ""
     var titleServerUrl: String?
-    var assets = NSMutableArray()
+    var assets: [PHAsset] = []
     var cryptated: Bool = false
     var session: String = ""
     weak var delegate: createFormUploadAssetsDelegate?
@@ -41,14 +42,18 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
     let targetSizeImagePreview = CGSize(width:100, height: 100)
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     
-    @objc convenience init(serverUrl : String, assets : NSMutableArray, cryptated : Bool, session : String, delegate: createFormUploadAssetsDelegate) {
+    @objc convenience init(serverUrl: String, assets: [PHAsset], cryptated: Bool, session: String, delegate: createFormUploadAssetsDelegate?) {
         
         self.init()
         
-        if serverUrl == CCUtility.getHomeServerUrlActiveUrl(appDelegate.activeUrl) {
+        if serverUrl == NCUtilityFileSystem.shared.getHomeServer(urlBase: appDelegate.urlBase, account: appDelegate.account) {
             titleServerUrl = "/"
         } else {
-            titleServerUrl = (serverUrl as NSString).lastPathComponent
+            if let tableDirectory = NCManageDatabase.shared.getTableDirectory(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@", appDelegate.account, serverUrl)) {
+                if let metadata = NCManageDatabase.shared.getMetadataFromOcId(tableDirectory.ocId) {
+                    titleServerUrl = metadata.fileNameView
+                } else { titleServerUrl = (serverUrl as NSString).lastPathComponent }
+            } else { titleServerUrl = (serverUrl as NSString).lastPathComponent }
         }
         
         self.serverUrl = serverUrl
@@ -68,19 +73,21 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         
         super.viewDidLoad()
         
+        self.title = NSLocalizedString("_upload_photos_videos_", comment: "")
+        
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_cancel_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(cancel))
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
         
         self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
         
-        if assets.count == 1 && (assets[0] as! PHAsset).mediaType == PHAssetMediaType.image {
-            PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: targetSizeImagePreview, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, info) in
+        if assets.count == 1 && assets[0].mediaType == PHAssetMediaType.image {
+            PHImageManager.default().requestImage(for: assets[0], targetSize: targetSizeImagePreview, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, info) in
                 self.imagePreview = image
             })
         }
         
-        // Theming view
-        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(changeTheming), name: NSNotification.Name(rawValue: NCBrandGlobal.shared.notificationCenterChangeTheming), object: nil)
+
         changeTheming()
     }
     
@@ -92,7 +99,9 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
     }
     
     @objc func changeTheming() {
-        appDelegate.changeTheming(self, tableView: tableView, collectionView: nil, form: true)
+        view.backgroundColor = NCBrandColor.shared.backgroundForm
+        tableView.backgroundColor = NCBrandColor.shared.backgroundForm
+        tableView.reloadData()
         initializeForm()
         self.reloadForm()
     }
@@ -101,42 +110,11 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
     
     func initializeForm() {
         
-        let form : XLFormDescriptor = XLFormDescriptor(title: NSLocalizedString("_upload_photos_videos_", comment: "")) as XLFormDescriptor
+        let form : XLFormDescriptor = XLFormDescriptor() as XLFormDescriptor
         form.rowNavigationOptions = XLFormRowNavigationOptions.stopDisableRow
         
         var section : XLFormSectionDescriptor
         var row : XLFormRowDescriptor
-        
-        // Section Photo Editor only for one photo & IMI
-        
-        if assets.count == 1 && (assets[0] as! PHAsset).mediaType == PHAssetMediaType.image && self.imagePreview != nil {
-            
-            section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_modify_photo_", comment: ""))
-            form.addFormSection(section)
-            
-            row = XLFormRowDescriptor(tag: "ButtonPhotoEditor", rowType: XLFormRowDescriptorTypeButton, title: NSLocalizedString("_modify_photo_", comment: ""))
-            row.action.formSelector = #selector(photoEditor(_:))
-            row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
-            
-            row.cellConfig["imageView.image"] = self.imagePreview
-            row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
-            row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
-            row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-            
-            section.addFormRow(row)
-            
-            if NCBrandOptions.sharedInstance.use_imi_viewer {
-                
-                row = XLFormRowDescriptor(tag: "createIMI", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_im_create_new_file", tableName: "IMLocalizable", bundle: Bundle.main, value: "", comment: ""))
-                row.value = 0
-                row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
-                
-                row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-                row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
-                
-                section.addFormRow(row)
-            }
-        }
         
         // Section: Destination Folder
         
@@ -145,28 +123,28 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         
         row = XLFormRowDescriptor(tag: "ButtonDestinationFolder", rowType: XLFormRowDescriptorTypeButton, title: self.titleServerUrl)
         row.action.formSelector = #selector(changeDestinationFolder(_:))
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
-        row.cellConfig["imageView.image"] = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement) as UIImage
+        row.cellConfig["imageView.image"] = UIImage(named: "folder")!.image(color: NCBrandColor.shared.brandElement, size: 25)
         row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         section.addFormRow(row)
         
         // User folder Autoupload
         row = XLFormRowDescriptor(tag: "useFolderAutoUpload", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_use_folder_auto_upload_", comment: ""))
         row.value = 0
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         section.addFormRow(row)
         
         // Use Sub folder
         row = XLFormRowDescriptor(tag: "useSubFolder", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_autoupload_create_subfolder_", comment: ""))
-        let tableAccount = NCManageDatabase.sharedInstance.getAccountActive()
+        let tableAccount = NCManageDatabase.shared.getAccountActive()
         if tableAccount?.autoUploadCreateSubfolder == true {
             row.value = 1
         } else {
@@ -175,7 +153,7 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         row.hidden = "$\("useFolderAutoUpload") == 0"
         
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         section.addFormRow(row)
 
@@ -187,23 +165,23 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         // Maintain the original fileName
         
         row = XLFormRowDescriptor(tag: "maintainOriginalFileName", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_maintain_original_filename_", comment: ""))
-        row.value = CCUtility.getOriginalFileName(k_keyFileNameOriginal)
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.value = CCUtility.getOriginalFileName(NCBrandGlobal.shared.keyFileNameOriginal)
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         section.addFormRow(row)
         
         // Add File Name Type
         
         row = XLFormRowDescriptor(tag: "addFileNameType", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_add_filenametype_", comment: ""))
-        row.value = CCUtility.getFileNameType(k_keyFileNameType)
+        row.value = CCUtility.getFileNameType(NCBrandGlobal.shared.keyFileNameType)
         row.hidden = "$\("maintainOriginalFileName") == 1"
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         section.addFormRow(row)
         
@@ -213,19 +191,19 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         form.addFormSection(section)
         
         row = XLFormRowDescriptor(tag: "maskFileName", rowType: XLFormRowDescriptorTypeAccount, title: (NSLocalizedString("_filename_", comment: "")))
-        let fileNameMask : String = CCUtility.getFileNameMask(k_keyFileNameMask)
+        let fileNameMask : String = CCUtility.getFileNameMask(NCBrandGlobal.shared.keyFileNameMask)
         if fileNameMask.count > 0 {
             row.value = fileNameMask
         }
         row.hidden = "$\("maintainOriginalFileName") == 1"
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.shared.textView
         
         row.cellConfig["textField.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textField.font"] = UIFont.systemFont(ofSize: 15.0)
-        row.cellConfig["textField.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textField.textColor"] = NCBrandColor.shared.textView
 
         section.addFormRow(row)
         
@@ -234,11 +212,11 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         row = XLFormRowDescriptor(tag: "previewFileName", rowType: XLFormRowDescriptorTypeTextView, title: "")
         row.height = 180
         row.disabled = true
-        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["backgroundColor"] = NCBrandColor.shared.backgroundForm
 
-        row.cellConfig["textView.backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+        row.cellConfig["textView.backgroundColor"] = NCBrandColor.shared.backgroundForm
         row.cellConfig["textView.font"] = UIFont.systemFont(ofSize: 14.0)
-        row.cellConfig["textView.textColor"] = NCBrandColor.sharedInstance.textView
+        row.cellConfig["textView.textColor"] = NCBrandColor.shared.textView
 
         section.addFormRow(row)
         
@@ -249,14 +227,7 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         
         super.formRowDescriptorValueHasChanged(formRow, oldValue: oldValue, newValue: newValue)
         
-        if formRow.tag == "createIMI" {
-            if (formRow.value! as AnyObject).boolValue  == true {
-                
-            } else {
-                
-            }
-        }
-        else if formRow.tag == "useFolderAutoUpload" {
+        if formRow.tag == "useFolderAutoUpload" {
             
             if (formRow.value! as AnyObject).boolValue  == true {
                 
@@ -278,11 +249,11 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
             }
         }
         else if formRow.tag == "maintainOriginalFileName" {
-            CCUtility.setOriginalFileName((formRow.value! as AnyObject).boolValue, key: k_keyFileNameOriginal)
+            CCUtility.setOriginalFileName((formRow.value! as AnyObject).boolValue, key: NCBrandGlobal.shared.keyFileNameOriginal)
             self.reloadForm()
         }
         else if formRow.tag == "addFileNameType" {
-            CCUtility.setFileNameType((formRow.value! as AnyObject).boolValue, key: k_keyFileNameType)
+            CCUtility.setFileNameType((formRow.value! as AnyObject).boolValue, key: NCBrandGlobal.shared.keyFileNameType)
             self.reloadForm()
         }
         else if formRow.tag == "maskFileName" {
@@ -307,7 +278,7 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
                     
                     self.reloadFormRow(formRow)
                     
-                    appDelegate.messageNotification("_info_", description: "_forbidden_characters_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                    NCContentPresenter.shared.messageNotification("_info_", description: "_forbidden_characters_", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.info, errorCode: NCBrandGlobal.shared.ErrorCharactersForbidden, forced: true)
                 }
             }
             
@@ -332,16 +303,21 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
     
     // MARK: - Action
     
-    func dismissSelect(serverUrl: String?, metadata: tableMetadata?, type: String) {
+    func dismissSelect(serverUrl: String?, metadata: tableMetadata?, type: String, items: [Any], buttonType: String, overwrite: Bool) {
         
         if serverUrl != nil {
             
             self.serverUrl = serverUrl!
             
-            if serverUrl == CCUtility.getHomeServerUrlActiveUrl(appDelegate.activeUrl) {
+            if serverUrl == NCUtilityFileSystem.shared.getHomeServer(urlBase: appDelegate.urlBase, account: appDelegate.account) {
                 self.titleServerUrl = "/"
             } else {
-                self.titleServerUrl = (serverUrl! as NSString).lastPathComponent
+                if let tableDirectory = NCManageDatabase.shared.getTableDirectory(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@", appDelegate.account
+                    , self.serverUrl)) {
+                    if let metadata = NCManageDatabase.shared.getMetadataFromOcId(tableDirectory.ocId) {
+                        titleServerUrl = metadata.fileNameView
+                    } else { titleServerUrl = (self.serverUrl as NSString).lastPathComponent }
+                } else { titleServerUrl = (self.serverUrl as NSString).lastPathComponent }                
             }
             
             // Update
@@ -351,6 +327,7 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         }
     }
     
+    /*
     @objc func save() {
         
         self.dismiss(animated: true, completion: {
@@ -361,12 +338,138 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
             
             if (useFolderPhotoRow.value! as AnyObject).boolValue == true {
                 
-                self.serverUrl = NCManageDatabase.sharedInstance.getAccountAutoUploadPath(self.appDelegate.activeUrl)
+                self.serverUrl = NCManageDatabase.shared.getAccountAutoUploadPath(urlBase: self.appDelegate.urlBase, account: self.appDelegate.account)
                 useSubFolder = (useSubFolderRow.value! as AnyObject).boolValue
             }
             
             self.appDelegate.activeMain.uploadFileAsset(self.assets, serverUrl: self.serverUrl, useSubFolder: useSubFolder, session: self.session)
         })
+    }
+    */
+    
+    @objc func save() {
+         
+        DispatchQueue.global().async {
+        
+            let useFolderPhotoRow: XLFormRowDescriptor  = self.form.formRow(withTag: "useFolderAutoUpload")!
+            let useSubFolderRow: XLFormRowDescriptor  = self.form.formRow(withTag: "useSubFolder")!
+            var useSubFolder: Bool = false
+            var metadatasMOV: [tableMetadata] = []
+            var metadatasNOConflict: [tableMetadata] = []
+            var metadatasUploadInConflict: [tableMetadata] = []
+
+            if (useFolderPhotoRow.value! as AnyObject).boolValue == true {
+                self.serverUrl = NCManageDatabase.shared.getAccountAutoUploadPath(urlBase: self.appDelegate.urlBase, account: self.appDelegate.account)
+                useSubFolder = (useSubFolderRow.value! as AnyObject).boolValue
+            }
+            
+            let autoUploadPath = NCManageDatabase.shared.getAccountAutoUploadPath(urlBase: self.appDelegate.urlBase, account: self.appDelegate.account)
+            if autoUploadPath == self.serverUrl {
+                if !NCNetworking.shared.createFolder(assets: self.assets, selector: NCBrandGlobal.shared.selectorUploadFile, useSubFolder: useSubFolder, account: self.appDelegate.account, urlBase: self.appDelegate.urlBase) {
+                    NCContentPresenter.shared.messageNotification("_error_", description: "_error_createsubfolders_upload_", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
+                    return
+                }
+            }
+
+            for asset in self.assets {
+                    
+                var serverUrl = self.serverUrl
+                var livePhoto: Bool = false
+                let fileName = CCUtility.createFileName(asset.value(forKey: "filename") as? String, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: NCBrandGlobal.shared.keyFileNameMask, keyFileNameType: NCBrandGlobal.shared.keyFileNameType, keyFileNameOriginal: NCBrandGlobal.shared.keyFileNameOriginal)!
+                let assetDate = asset.creationDate ?? Date()
+                let dateFormatter = DateFormatter()
+                
+                // Detect LivePhoto Upload
+                if asset.mediaSubtypes.contains(.photoLive) && CCUtility.getLivePhoto() {
+                    livePhoto = true
+                } 
+                
+                // Create serverUrl if use sub folder
+                if useSubFolder {
+                    
+                    dateFormatter.dateFormat = "yyyy"
+                    let yearString = dateFormatter.string(from: assetDate)
+                   
+                    dateFormatter.dateFormat = "MM"
+                    let monthString = dateFormatter.string(from: assetDate)
+                    
+                    serverUrl = autoUploadPath + "/" + yearString + "/" + monthString
+                }
+                
+                // Check if is in upload
+                let isRecordInSessions = NCManageDatabase.shared.getAdvancedMetadatas(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileName == %@ AND session != ''", self.appDelegate.account, serverUrl, fileName), sorted: "fileName", ascending: false)
+                if isRecordInSessions.count > 0 {
+                    continue
+                }
+                
+                let metadataForUpload = NCManageDatabase.shared.createMetadata(account: self.appDelegate.account, fileName: fileName, ocId: NSUUID().uuidString, serverUrl: serverUrl, urlBase: self.appDelegate.urlBase, url: "", contentType: "", livePhoto: livePhoto)
+                
+                metadataForUpload.assetLocalIdentifier = asset.localIdentifier
+                metadataForUpload.session = self.session
+                metadataForUpload.sessionSelector = NCBrandGlobal.shared.selectorUploadFile
+                metadataForUpload.size = NCUtilityFileSystem.shared.getFileSize(asset: asset)
+                metadataForUpload.status = NCBrandGlobal.shared.metadataStatusWaitUpload
+                
+                if livePhoto {
+                    
+                    let fileNameMove = (fileName as NSString).deletingPathExtension + ".mov"
+                    let ocId = NSUUID().uuidString
+                    let filePath = CCUtility.getDirectoryProviderStorageOcId(ocId, fileNameView: fileNameMove)!
+                    
+                    let semaphore = Semaphore()
+                    CCUtility.extractLivePhotoAsset(asset, filePath: filePath) { (url) in
+                        if let url = url {
+                            let fileSize = NCUtilityFileSystem.shared.getFileSize(filePath: url.path)
+                            let metadataMOVForUpload = NCManageDatabase.shared.createMetadata(account: self.appDelegate.account, fileName: fileNameMove, ocId:ocId, serverUrl: serverUrl, urlBase: self.appDelegate.urlBase, url: "", contentType: "", livePhoto: livePhoto)
+
+                            metadataForUpload.livePhoto = true
+                            metadataMOVForUpload.livePhoto = true
+                            
+                            metadataMOVForUpload.session = self.session
+                            metadataMOVForUpload.sessionSelector = NCBrandGlobal.shared.selectorUploadFile
+                            metadataMOVForUpload.size = fileSize
+                            metadataMOVForUpload.status = NCBrandGlobal.shared.metadataStatusWaitUpload
+                            metadataMOVForUpload.typeFile = NCBrandGlobal.shared.metadataTypeFileVideo
+
+                            metadatasMOV.append(metadataMOVForUpload)
+                        }
+                        semaphore.continue()
+                    }
+                    semaphore.wait()
+                }
+                
+                if NCManageDatabase.shared.getMetadataConflict(account: self.appDelegate.account, serverUrl: serverUrl, fileName: fileName) != nil {
+                    metadatasUploadInConflict.append(metadataForUpload)
+                } else {
+                    metadatasNOConflict.append(metadataForUpload)
+                }
+            }
+            
+            // Verify if file(s) exists
+            if metadatasUploadInConflict.count > 0 {
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    if let conflict = UIStoryboard.init(name: "NCCreateFormUploadConflict", bundle: nil).instantiateInitialViewController() as? NCCreateFormUploadConflict {
+                        
+                        conflict.serverUrl = self.serverUrl
+                        conflict.metadatasNOConflict = metadatasNOConflict
+                        conflict.metadatasMOV = metadatasMOV
+                        conflict.metadatasUploadInConflict = metadatasUploadInConflict
+                    
+                        self.appDelegate.window.rootViewController?.present(conflict, animated: true, completion: nil)
+                    }
+                }
+                
+            } else {
+                
+                NCManageDatabase.shared.addMetadatas(metadatasNOConflict)
+                NCManageDatabase.shared.addMetadatas(metadatasMOV)
+                
+                self.appDelegate.networkingAutoUpload.startProcess()
+            }
+        
+            DispatchQueue.main.async {self.dismiss(animated: true, completion: nil)  }
+        }
     }
     
     @objc func cancel() {
@@ -379,9 +482,9 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
     func previewFileName(valueRename : String?) -> String {
         
         var returnString: String = ""
-        let asset = assets[0] as! PHAsset
+        let asset = assets[0]
         
-        if (CCUtility.getOriginalFileName(k_keyFileNameOriginal)) {
+        if (CCUtility.getOriginalFileName(NCBrandGlobal.shared.keyFileNameOriginal)) {
             
             return (NSLocalizedString("_filename_", comment: "") + ": " + (asset.value(forKey: "filename") as! String))
             
@@ -392,24 +495,24 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
             if valueRenameTrimming.count > 0 {
                 
                 self.form.delegate = nil
-                CCUtility.setFileNameMask(valueRename, key: k_keyFileNameMask)
+                CCUtility.setFileNameMask(valueRename, key: NCBrandGlobal.shared.keyFileNameMask)
                 self.form.delegate = self
                 
-                returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: k_keyFileNameMask, keyFileNameType: k_keyFileNameType, keyFileNameOriginal: k_keyFileNameOriginal)
+                returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: NCBrandGlobal.shared.keyFileNameMask, keyFileNameType: NCBrandGlobal.shared.keyFileNameType, keyFileNameOriginal: NCBrandGlobal.shared.keyFileNameOriginal)
                 
             } else {
                 
-                CCUtility.setFileNameMask("", key: k_keyFileNameMask)
-                returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: nil, keyFileNameType: k_keyFileNameType, keyFileNameOriginal: k_keyFileNameOriginal)
+                CCUtility.setFileNameMask("", key: NCBrandGlobal.shared.keyFileNameMask)
+                returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: nil, keyFileNameType: NCBrandGlobal.shared.keyFileNameType, keyFileNameOriginal: NCBrandGlobal.shared.keyFileNameOriginal)
             }
             
         } else {
             
-            CCUtility.setFileNameMask("", key: k_keyFileNameMask)
-            returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: nil, keyFileNameType: k_keyFileNameType, keyFileNameOriginal: k_keyFileNameOriginal)
+            CCUtility.setFileNameMask("", key: NCBrandGlobal.shared.keyFileNameMask)
+            returnString = CCUtility.createFileName(asset.value(forKey: "filename") as! String?, fileDate: asset.creationDate, fileType: asset.mediaType, keyFileName: nil, keyFileNameType: NCBrandGlobal.shared.keyFileNameType, keyFileNameOriginal: NCBrandGlobal.shared.keyFileNameOriginal)
         }
         
-        return String(format: NSLocalizedString("_preview_filename_", comment: ""), "MM,MMM,DD,YY,YYYY and HH,hh,mm,ss,ampm") + ":" + "\n\n" + returnString
+        return String(format: NSLocalizedString("_preview_filename_", comment: ""), "MM, MMM, DD, YY, YYYY, HH, hh, mm, ss, ampm") + ":" + "\n\n" + returnString
     }
     
     @objc func changeDestinationFolder(_ sender: XLFormRowDescriptor) {
@@ -424,62 +527,11 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEdi
         viewController.hideButtonCreateFolder = false
         viewController.includeDirectoryE2EEncryption = true
         viewController.includeImages = false
-        viewController.layoutViewSelect = k_layout_view_move
         viewController.selectFile = false
         viewController.titleButtonDone = NSLocalizedString("_select_", comment: "")
         viewController.type = ""
         
         navigationController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
         self.present(navigationController, animated: true, completion: nil)
-    }
-    
-    @objc func photoEditor(_ sender: XLFormRowDescriptor) {
-        
-        self.deselectFormRow(sender)
-        
-        PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: PHImageManagerMaximumSize, contentMode: PHImageContentMode.default, options: requestOptions, resultHandler: { (image, info) in
-            
-            let photoEditor = PhotoEditorViewController(nibName:"PhotoEditorViewController",bundle: Bundle(for: PhotoEditorViewController.self))
-
-            photoEditor.image = image
-            photoEditor.photoEditorDelegate = self
-            photoEditor.hiddenControls = [.save, .share, .sticker]
-            
-            photoEditor.cancelButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCancel")!, multiplier:2, color: .white)
-            photoEditor.cropButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCrop")!, multiplier:2, color: .white)
-            photoEditor.drawButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDraw")!, multiplier:2, color: .white)
-            photoEditor.textButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorText")!, multiplier:2, color: .white)
-            photoEditor.clearButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorClear")!, multiplier:2, color: .white)
-            photoEditor.continueButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDone")!, multiplier:2, color: .white)
-            
-            self.present(photoEditor, animated: true, completion: nil)
-        })
-    }
-    
-    // MARK: - Photo Editor Delegate
-
-    func doneEditing(image: UIImage) {
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(imageSaved(_:didFinishSavingWithError:contextInfo:)), nil)
-    }
-    
-    @objc func imageSaved(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        
-        let fetchOptions = PHFetchOptions()
-        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        let fetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
-        if let asset = fetchResult.firstObject {
-            self.assets = NSMutableArray(array: [asset])
-        }
-        
-        // Preview
-        PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: targetSizeImagePreview, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, info) in
-            let row : XLFormRowDescriptor  = self.form.formRow(withTag: "ButtonPhotoEditor")!
-            row.cellConfig["imageView.image"] = image
-            self.updateFormRow(row)
-        })
-    }
-    
-    func canceledEditing() {
-        print("Canceled")
     }
 }

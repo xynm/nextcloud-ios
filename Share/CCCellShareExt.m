@@ -3,7 +3,7 @@
 //  Nextcloud iOS
 //
 //  Created by Marino Faggiana on 29/07/15.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2015 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -29,9 +29,6 @@
 {
     self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
     if (self) {
-        // Initialization code
-
-        
     }
     return self;
 }
@@ -39,19 +36,8 @@
 - (void)setSelected:(BOOL)selected animated:(BOOL)animated
 {
     [super setSelected:selected animated:animated];
-
-    // Configure the view for the selected state
 }
 
-///-----------------------------------
-/// @name scrollViewWillBeginDecelerating
-///-----------------------------------
-
-/**
- * Method to initialize the position where we make the swipe in order to detect the direction
- *
- * @param UIScrollView -> scrollView
- */
 - (void)scrollViewWillBeginDecelerating:(UIScrollView *)scrollView {
     _lastContentOffset = scrollView.contentOffset.x;
 }

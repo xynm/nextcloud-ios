@@ -6,6 +6,87 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.3.0] - 2020-02-18
+- See https://github.com/nextcloud/ios/releases/tag/3.3.0
+
+## [3.2.0] - 2020-01-25
+- See https://github.com/nextcloud/ios/releases/tag/3.2.0
+
+## [3.1.0] - 2020-12-14
+- See https://github.com/nextcloud/ios/releases/tag/3.1.0
+
+## [3.0.15] - 2020-11-29
+- See https://github.com/nextcloud/ios/releases/tag/3.0.15
+
+## [3.0.14] - 2020-11-24
+- See https://github.com/nextcloud/ios/releases/tag/3.0.14
+
+## [3.0.13] - 2020-11-14
+- See https://github.com/nextcloud/ios/releases/tag/3.0.13
+
+## [3.0.12] - 2020-11-06
+- See https://github.com/nextcloud/ios/releases/tag/3.0.12
+
+## [3.0.11] - 2020-10-22
+- See https://github.com/nextcloud/ios/releases/tag/3.0.11
+
+## [3.0.10] - 2020-10-17
+- See https://github.com/nextcloud/ios/releases/tag/3.0.10
+
+## [3.0.8] - 2020-09-28
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.8
+
+## [3.0.7] - 2020-09-25
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.7
+
+## [3.0.6] - 2020-08-26
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.6
+
+## [3.0.5] - 2020-08-20
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.5
+
+## [3.0.4] - 2020-08-13
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.4
+
+## [3.0.3] - 2020-08-06
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.3
+
+## [3.0.2] - 2020-07-29
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.2
+
+## [3.0.1] - 2020-07-09
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.1
+
+## [3.0.0] - 2020-06-19
+- See https://github.com/nextcloud/ios/releases/tag/v3.0.0
+
+## [2.25.9] - 2020-02-19
+- See https://github.com/nextcloud/ios/milestone/67
+
+## [2.25.8] - 2020-02-14
+- See https://github.com/nextcloud/ios/milestone/66
+
+## [2.25.7] - 2020-02-12
+- See https://github.com/nextcloud/ios/milestone/65
+
+## [2.25.6] - 2020-02-07
+- See https://github.com/nextcloud/ios/milestone/64
+
+## [2.25.5] - 2020-01-26
+- See https://github.com/nextcloud/ios/milestone/63
+
+## [2.25.4] - 2020-01-24
+- See https://github.com/nextcloud/ios/milestone/62
+
+## [2.25.3] - 2019-12-24
+- See https://github.com/nextcloud/ios/milestone/61
+
+## [2.25.2] - 2019-12-15
+- See https://github.com/nextcloud/ios/milestone/60
+
+## [2.25.1] - 2019-12-08
+- See https://github.com/nextcloud/ios/milestone/59
+
 ## [2.25.0] - 2019-11-20
 - See https://github.com/nextcloud/ios/milestone/58
 

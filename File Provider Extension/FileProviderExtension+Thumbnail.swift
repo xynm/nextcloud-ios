@@ -33,8 +33,7 @@ extension FileProviderExtension {
         
         for itemIdentifier in itemIdentifiers {
             
-            guard let metadata = fileProviderUtility.sharedInstance.getTableMetadataFromItemIdentifier(itemIdentifier) else {
-                
+            guard let metadata = fileProviderUtility.shared.getTableMetadataFromItemIdentifier(itemIdentifier) else {
                 counterProgress += 1
                 if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
                 continue
@@ -42,28 +41,28 @@ extension FileProviderExtension {
             
             if (metadata.hasPreview) {
                 
-                let width = NCUtility.sharedInstance.getScreenWidthForPreview()
-                let height = NCUtility.sharedInstance.getScreenHeightForPreview()
-                
-                let fileNamePath = CCUtility.returnFileNamePath(fromFileName: metadata.fileName, serverUrl: metadata.serverUrl, activeUrl: fileProviderData.sharedInstance.accountUrl)!
-                let fileNameLocalPath = CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileNameView)!
-                let serverUrl = fileProviderData.sharedInstance.accountUrl
+                let fileNamePath = CCUtility.returnFileNamePath(fromFileName: metadata.fileName, serverUrl: metadata.serverUrl, urlBase: metadata.urlBase, account: metadata.account)!
+                let fileNameIconLocalPath = CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, etag: metadata.etag)!
                     
-                NCCommunication.sharedInstance.downloadPreview(serverUrl: serverUrl, fileNamePath: fileNamePath, fileNameLocalPath: fileNameLocalPath ,width: width, height: height, account: fileProviderData.sharedInstance.account) { (account, data, errorCode, errorDescription) in
+                NCCommunication.shared.getPreview(fileNamePath: fileNamePath, widthPreview: NCBrandGlobal.shared.sizeIcon, heightPreview: NCBrandGlobal.shared.sizeIcon) { (account, data, errorCode, errorDescription) in
                     if errorCode == 0 && data != nil {
+                        do {
+                            try data!.write(to: URL.init(fileURLWithPath: fileNameIconLocalPath), options: .atomic)
+                        } catch { }
                         perThumbnailCompletionHandler(itemIdentifier, data, nil)
                     } else {
                         perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.serverUnreachable))
                     }
-                    
                     counterProgress += 1
-                    if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+                    if (counterProgress == progress.totalUnitCount) {
+                        completionHandler(nil)
+                    }
                 }
-               
             } else {
-                
                 counterProgress += 1
-                if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+                if (counterProgress == progress.totalUnitCount) {
+                    completionHandler(nil)
+                }
             }
         }
         

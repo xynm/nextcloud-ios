@@ -3,7 +3,7 @@
 //  Nextcloud
 //
 //  Created by Marino Faggiana on 08/03/19.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2019 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -131,7 +131,7 @@ class NCAudioRecorderViewController: UIViewController , NCAudioRecorderDelegate 
         voiceRecordHUD.update(CGFloat(rate))
         voiceRecordHUD.fillColor = UIColor.green
         recordDuration += 1
-        durationLabel.text = NCUtility.sharedInstance.formatSecondsToString(recordDuration/60)
+        durationLabel.text =  String.init().formatSecondsToString(recordDuration/60)
     }
 }
 

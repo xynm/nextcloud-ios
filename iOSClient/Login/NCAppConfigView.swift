@@ -22,6 +22,7 @@
 //
 
 import Foundation
+import NCCommunication
 
 class NCAppConfigView: UIViewController {
 
@@ -37,15 +38,20 @@ class NCAppConfigView: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        self.view.backgroundColor = NCBrandColor.sharedInstance.brand
-        titleLabel.textColor = NCBrandColor.sharedInstance.brandText
+        self.view.backgroundColor = NCBrandColor.shared.brandElement
+        titleLabel.textColor = NCBrandColor.shared.brandText
         
         titleLabel.text = NSLocalizedString("_appconfig_view_title_", comment: "")
         
-        let serverConfig = UserDefaults.standard.dictionary(forKey: NCBrandConfiguration.sharedInstance.configuration_bundleId)
-        serverUrl = serverConfig?[NCBrandConfiguration.sharedInstance.configuration_serverUrl] as? String
-        username = serverConfig?[NCBrandConfiguration.sharedInstance.configuration_username] as? String
-        password = serverConfig?[NCBrandConfiguration.sharedInstance.configuration_password] as? String
+        if let serverConfig = UserDefaults.standard.dictionary(forKey: NCBrandConfiguration.shared.configuration_bundleId) {
+            serverUrl = serverConfig[NCBrandConfiguration.shared.configuration_serverUrl] as? String
+            username = serverConfig[NCBrandConfiguration.shared.configuration_username] as? String
+            password = serverConfig[NCBrandConfiguration.shared.configuration_password] as? String
+        } else {
+            serverUrl = UserDefaults.standard.string(forKey: NCBrandConfiguration.shared.configuration_serverUrl)
+            username = UserDefaults.standard.string(forKey: NCBrandConfiguration.shared.configuration_username)
+            password = UserDefaults.standard.string(forKey: NCBrandConfiguration.shared.configuration_password)
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -55,45 +61,45 @@ class NCAppConfigView: UIViewController {
         appDelegate.timerErrorNetworking.invalidate()
         
         guard let serverUrl = self.serverUrl else {
-            appDelegate.messageNotification("_error_", description: "User Default, serverUrl not found", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: 0)
+            NCContentPresenter.shared.messageNotification("_error_", description: "User Default, serverUrl not found", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
             return
         }
         guard let username = self.username else {
-            appDelegate.messageNotification("_error_", description: "User Default, username not found", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: 0)
+            NCContentPresenter.shared.messageNotification("_error_", description: "User Default, username not found", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
             return
         }
         guard let password = self.password else {
-            appDelegate.messageNotification("_error_", description: "User Default, password not found", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: 0)
+            NCContentPresenter.shared.messageNotification("_error_", description: "User Default, password not found", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
             return
         }
         
-        OCNetworking.sharedManager()?.getAppPassword(serverUrl, username: username, password: password, completion: { (token, message, errorCode) in
+        NCCommunication.shared.getAppPassword(serverUrl: serverUrl, username: username, password: password, userAgent: nil) { (token, errorCode, errorDescription) in
             DispatchQueue.main.async {
-                if errorCode == 0 {
+                if errorCode == 0 && token != nil {
                     let account: String = "\(username) \(serverUrl)"
                     
                     // NO account found, clear
-                    if NCManageDatabase.sharedInstance.getAccounts() == nil { NCUtility.sharedInstance.removeAllSettings() }
+                    if NCManageDatabase.shared.getAccounts() == nil { NCUtility.shared.removeAllSettings() }
                     
                     // Add new account
-                    NCManageDatabase.sharedInstance.deleteAccount(account)
-                    NCManageDatabase.sharedInstance.addAccount(account, url: serverUrl, user: username, password: token!)
+                    NCManageDatabase.shared.deleteAccount(account)
+                    NCManageDatabase.shared.addAccount(account, urlBase: serverUrl, user: username, password: token!)
                     
-                    guard let tableAccount = NCManageDatabase.sharedInstance.setAccountActive(account) else {
-                        self.appDelegate.messageNotification("_error_", description: "setAccountActive error", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: 0)
+                    guard let tableAccount = NCManageDatabase.shared.setAccountActive(account) else {
+                        NCContentPresenter.shared.messageNotification("_error_", description: "setAccountActive error", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
                         self.dismiss(animated: true, completion: nil)
                         return
                     }
                     
-                    self.appDelegate.settingActiveAccount(account, activeUrl: serverUrl, activeUser: username, activeUserID: tableAccount.userID, activePassword: token!)
-                    NotificationCenter.default.post(name: NSNotification.Name(rawValue: "initializeMain"), object: nil, userInfo: nil)
+                    self.appDelegate.settingAccount(account, urlBase: serverUrl, user: username, userID: tableAccount.userID, password: token!)
+                    NotificationCenter.default.postOnMainThread(name: NCBrandGlobal.shared.notificationCenterInitializeMain)
                     
                     self.dismiss(animated: true) {}
                 } else {
-                    self.appDelegate.messageNotification("_error_", description: message, visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: errorCode)
+                    NCContentPresenter.shared.messageNotification("_error_", description: errorDescription, delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: errorCode)
                 }
             }
-        })
+        }
     }
     
     override func viewDidDisappear(_ animated: Bool) {

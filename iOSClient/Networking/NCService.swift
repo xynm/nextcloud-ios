@@ -26,7 +26,7 @@ import SVGKit
 import NCCommunication
 
 class NCService: NSObject {
-    @objc static let sharedInstance: NCService = {
+    @objc static let shared: NCService = {
         let instance = NCService()
         return instance
     }()
@@ -34,91 +34,92 @@ class NCService: NSObject {
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     
     //MARK: -
-    //MARK: Start Services API NC
     
     @objc public func startRequestServicesServer() {
    
-        if (appDelegate.activeAccount == nil || appDelegate.activeAccount.count == 0 || appDelegate.maintenanceMode == true) {
-            return
-        }
+        if appDelegate.account == nil || appDelegate.account.count == 0 { return }
         
         self.requestUserProfile()
         self.requestServerStatus()
     }
 
     //MARK: -
-    //MARK: Internal request Service API NC
     
     private func requestUserProfile() {
         
-        if (appDelegate.activeAccount == nil || appDelegate.activeAccount.count == 0 || appDelegate.maintenanceMode == true) {
-            return
-        }
+        if appDelegate.account == nil || appDelegate.account.count == 0 { return }
         
-        OCNetworking.sharedManager().getUserProfile(withAccount: appDelegate.activeAccount, completion: { (account, userProfile, message, errorCode) in
-            
-            if errorCode == 0 && account == self.appDelegate.activeAccount {
-                
-                // Update User (+ userProfile.id) & active account & account network
-                guard let tableAccount = NCManageDatabase.sharedInstance.setAccountUserProfile(userProfile!, HCProperties: false) else {
-                    self.appDelegate.messageNotification("Accopunt", description: "Internal error : account not found on DB", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: Int(k_CCErrorInternalError))
-                    return
-                }
-                
-                let user = tableAccount.user
-                let url = tableAccount.url
-                
-                self.appDelegate.settingActiveAccount(tableAccount.account, activeUrl: tableAccount.url, activeUser: tableAccount.user, activeUserID: tableAccount.userID, activePassword: CCUtility.getPassword(tableAccount.account))
-                
-                // Call func thath required the userdID
-                self.appDelegate.activeFavorites.listingFavorites()
-                self.appDelegate.activeMedia.reloadDataSource(loadNetworkDatasource: true)
-                NCFunctionMain.sharedInstance.synchronizeOffline()
-                
+        NCCommunication.shared.getUserProfile() { (account, userProfile, errorCode, errorDescription) in
+               
+            if errorCode == 0 && account == self.appDelegate.account {
+                  
                 DispatchQueue.global().async {
+                
+                    // Update User (+ userProfile.id) & active account & account network
+                    guard let tableAccount = NCManageDatabase.shared.setAccountUserProfile(userProfile!) else {
+                        NCContentPresenter.shared.messageNotification("Account", description: "Internal error : account not found on DB",  delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError)
+                        return
+                    }
+                
+                    let user = tableAccount.user
+                    let url = tableAccount.urlBase
+                    let stringUser = CCUtility.getStringUser(user, urlBase: url)!
                     
-                    let avatarUrl = "\(self.appDelegate.activeUrl!)/index.php/avatar/\(self.appDelegate.activeUser!)/\(k_avatar_size)".addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed)!
-                    let fileNamePath = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(user, activeUrl: url) + "-" + self.appDelegate.activeUser + ".png"
+                    self.appDelegate.settingAccount(tableAccount.account, urlBase: tableAccount.urlBase, user: tableAccount.user, userID: tableAccount.userID, password: CCUtility.getPassword(tableAccount.account))
+                       
+                    // Synchronize favorite                    
+                    NCNetworking.shared.listingFavoritescompletion(selector: NCBrandGlobal.shared.selectorReadFile) { (_, _, _, _) in }
+                
+                    // Synchronize Offline
+                    self.synchronizeOffline(account: tableAccount.account)
                     
-                    OCNetworking.sharedManager()?.downloadContents(ofUrl: avatarUrl, completion: { (data, message, errorCode) in
+                    // Get Avatar
+                    let avatarUrl = "\(self.appDelegate.urlBase!)/index.php/avatar/\(self.appDelegate.user!)/\(NCBrandGlobal.shared.avatarSize)".addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed)!
+                    let fileNamePath = CCUtility.getDirectoryUserData() + "/" + stringUser + "-" + self.appDelegate.user + ".png"
+                    NCCommunication.shared.downloadContent(serverUrl: avatarUrl) { (account, data, errorCode, errorMessage) in
+                        
                         if errorCode == 0 {
-                            if let image = UIImage(data: data!) {
-                                try? FileManager.default.removeItem(atPath: fileNamePath)
-                                if let data = image.pngData() {
-                                    try? data.write(to: URL(fileURLWithPath: fileNamePath))
+                            
+                            DispatchQueue.global().async {
+                                
+                                if let image = UIImage(data: data!) {
+                                    try? FileManager.default.removeItem(atPath: fileNamePath)
+                                    if let data = image.pngData() {
+                                        try? data.write(to: URL(fileURLWithPath: fileNamePath))
+                                    }
                                 }
                             }
                         }
-                    })
-                    
-                    DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: NSNotification.Name(rawValue: "changeUserProfile"), object: nil)
                     }
+                          
+                    NotificationCenter.default.postOnMainThread(name: NCBrandGlobal.shared.notificationCenterChangeUserProfile)
+                                        
+                    self.requestServerCapabilities()
                 }
-                
-                // Get Capabilities
-                self.requestServerCapabilities()
                 
             } else {
                 
-                if errorCode == kOCErrorServerUnauthorized || errorCode == kOCErrorServerForbidden {
-                    OCNetworking.sharedManager()?.checkRemoteUser(account, function: "get user profile", errorCode: errorCode)
+                if errorCode == 401 || errorCode == 403 {
+                    NCNetworkingCheckRemoteUser.shared.checkRemoteUser(account: account)
                 }
-                
-                print("[LOG] It has been changed user during networking process, error.")
             }
-        })
+        }
     }
     
     private func requestServerStatus() {
         
-        NCCommunication.sharedInstance.getServerStatus(urlString: appDelegate.activeUrl) { (serverProductName, serverVersion, versionMajor, versionMinor, versionMicro, extendedSupport, errorCode, errorMessage) in
+        NCCommunication.shared.getServerStatus(serverUrl: appDelegate.urlBase) { (serverProductName, serverVersion, versionMajor, versionMinor, versionMicro, extendedSupport, errorCode, errorMessage) in
+                        
             if errorCode == 0 {
-                if extendedSupport == false {
-                    if serverProductName == "owncloud" {
-                        self.appDelegate.messageNotification("_warning_", description: "_warning_owncloud_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: Int(k_CCErrorInternalError))
-                    } else if versionMajor <= k_nextcloud_unsupported {
-                        self.appDelegate.messageNotification("_warning_", description: "_warning_unsupported_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: Int(k_CCErrorInternalError))
+                
+                DispatchQueue.global().async {
+                    
+                    if extendedSupport == false {
+                        if serverProductName == "owncloud" {
+                            NCContentPresenter.shared.messageNotification("_warning_", description: "_warning_owncloud_", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.info, errorCode: NCBrandGlobal.shared.ErrorInternalError)
+                        } else if versionMajor <=  NCBrandGlobal.shared.nextcloud_unsupported_version {
+                            NCContentPresenter.shared.messageNotification("_warning_", description: "_warning_unsupported_", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.info, errorCode: NCBrandGlobal.shared.ErrorInternalError)
+                        }
                     }
                 }
             }
@@ -127,217 +128,149 @@ class NCService: NSObject {
     
     private func requestServerCapabilities() {
         
-        if (appDelegate.activeAccount == nil || appDelegate.activeAccount.count == 0 || appDelegate.maintenanceMode == true) {
-            return
-        }
+        if appDelegate.account == nil || appDelegate.account.count == 0 { return }
         
-        OCNetworking.sharedManager().getCapabilitiesWithAccount(appDelegate.activeAccount, completion: { (account, capabilities, message, errorCode) in
+        NCCommunication.shared.getCapabilities() { (account, data, errorCode, errorDescription) in
             
-            if errorCode == 0 && account == self.appDelegate.activeAccount {
+            if errorCode == 0 && data != nil {
                 
-                // Update capabilities db
-                NCManageDatabase.sharedInstance.addCapabilities(capabilities!, account: account!)
+                DispatchQueue.global().async {
                 
-                // ------ THEMING -----------------------------------------------------------------------
+                    NCManageDatabase.shared.addCapabilitiesJSon(data!, account: account)
                 
-                if (NCBrandOptions.sharedInstance.use_themingBackground && capabilities!.themingBackground != "") {
+                    let serverVersionMajor = NCManageDatabase.shared.getCapabilitiesServerInt(account: account, elements: NCElementsJSON.shared.capabilitiesVersionMajor)
                     
-                    // Download Theming Background
-                    DispatchQueue.global().async {
-                        
-                        // Download Logo
-                        if NCBrandOptions.sharedInstance.use_themingLogo {
-                            let fileNameThemingLogo = CCUtility.getStringUser(self.appDelegate.activeUser, activeUrl: self.appDelegate.activeUrl) + "-themingLogo.png"
-                            NCUtility.sharedInstance.convertSVGtoPNGWriteToUserData(svgUrlString: capabilities!.themingLogo, fileName: fileNameThemingLogo, width: 40, rewrite: true, closure: { (imageNamePath) in })
-                        }
-                        
-                        let backgroundURL = capabilities!.themingBackground!.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed)!
-                        let fileNamePath = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(self.appDelegate.activeUser, activeUrl: self.appDelegate.activeUrl) + "-themingBackground.png"
-                        
-                        OCNetworking.sharedManager()?.downloadContents(ofUrl: backgroundURL, completion: { (data, message, errorCode) in
+                    // Setup communication
+                    if serverVersionMajor > 0 {
+                        NCCommunicationCommon.shared.setup(nextcloudVersion: serverVersionMajor)
+                    }
+                    NCCommunicationCommon.shared.setup(webDav: NCUtilityFileSystem.shared.getWebDAV(account: account))
+                    NCCommunicationCommon.shared.setup(dav: NCUtilityFileSystem.shared.getDAV())
+                    
+                    // Theming
+                    NCBrandColor.shared.settingThemingColor(account: account)
+                
+                    // File Sharing
+                    let isFilesSharingEnabled = NCManageDatabase.shared.getCapabilitiesServerBool(account: account, elements: NCElementsJSON.shared.capabilitiesFileSharingApiEnabled, exists: false)
+                    if isFilesSharingEnabled {
+                        NCCommunication.shared.readShares { (account, shares, errorCode, ErrorDescription) in
                             if errorCode == 0 {
-                                if let image = UIImage(data: data!) {
-                                    try? FileManager.default.removeItem(atPath: fileNamePath)
-                                    if let data = image.pngData() {
-                                        try? data.write(to: URL(fileURLWithPath: fileNamePath))
-                                    }
+                                
+                                NCManageDatabase.shared.deleteTableShare(account: account)
+                                if shares != nil {
+                                    NCManageDatabase.shared.addShare(urlBase: self.appDelegate.urlBase, account: account, shares: shares!)
                                 }
+                                self.appDelegate.shares = NCManageDatabase.shared.getTableShares(account: account)
+                               
+                            } else {
+                                NCContentPresenter.shared.messageNotification("_share_", description: ErrorDescription, delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: errorCode)
                             }
-                        })
-                        
-                        DispatchQueue.main.async {
-                            self.appDelegate.settingThemingColorBrand()
                         }
                     }
                     
-                } else {
+                    let comments = NCManageDatabase.shared.getCapabilitiesServerBool(account: account, elements: NCElementsJSON.shared.capabilitiesFilesComments, exists: false)
+                    let activity = NCManageDatabase.shared.getCapabilitiesServerArray(account: account, elements: NCElementsJSON.shared.capabilitiesActivity)
                     
-                    self.appDelegate.settingThemingColorBrand()
-                }
+                    if !isFilesSharingEnabled && !comments && activity == nil {
+                        self.appDelegate.disableSharesView = true
+                    } else {
+                        self.appDelegate.disableSharesView = false
+                    }
                 
-                // ------ SEARCH ------------------------------------------------------------------------
-                
-                if (NCManageDatabase.sharedInstance.getServerVersion(account: account!) != capabilities!.versionMajor && self.appDelegate.activeMain != nil) {
-                    self.appDelegate.activeMain.cancelSearchBar()
-                }
-                
-                // ------ GET OTHER SERVICE -------------------------------------------------------------
-                
-                // Get Notification
-                if (capabilities!.isNotificationServerEnabled) {
-                    
-                    OCNetworking.sharedManager().getNotificationWithAccount(account!, completion: { (account, listOfNotifications, message, errorCode) in
-                        
-                        if errorCode == 0 && account == self.appDelegate.activeAccount {
-                            
-                            DispatchQueue.global().async {
+                    // Text direct editor detail
+                    if serverVersionMajor >= NCBrandGlobal.shared.nextcloudVersion18 {
+                        NCCommunication.shared.NCTextObtainEditorDetails() { (account, editors, creators, errorCode, errorMessage) in
+                            if errorCode == 0 && account == self.appDelegate.account {
                                 
-                                let sortedListOfNotifications = (listOfNotifications! as NSArray).sortedArray(using: [
-                                    NSSortDescriptor(key: "date", ascending: false)
-                                    ])
+                                DispatchQueue.global().async {
                                 
-                                var old = ""
-                                var new = ""
-                                
-                                for notification in listOfNotifications! {
-                                    // download icon
-                                    let id = (notification as! OCNotifications).idNotification
-                                    if let icon = (notification as! OCNotifications).icon {
-                                        
-                                        NCUtility.sharedInstance.convertSVGtoPNGWriteToUserData(svgUrlString: icon, fileName: nil, width: 25, rewrite: false, closure: { (imageNamePath) in })                                        
-                                    }
-                                    new = new + String(describing: id)
-                                }
-                                for notification in self.appDelegate.listOfNotifications! {
-                                    let id = (notification as! OCNotifications).idNotification
-                                    old = old + String(describing: id)
-                                }
-                                
-                                DispatchQueue.main.async {
+                                    NCManageDatabase.shared.addDirectEditing(account: account, editors: editors, creators: creators)
                                     
-                                    if (new != old) {
-                                        self.appDelegate.listOfNotifications = NSMutableArray.init(array: sortedListOfNotifications)
-                                        NotificationCenter.default.post(name: NSNotification.Name(rawValue: "notificationReloadData"), object: nil)
-                                    }
-                                    
-                                    // Update Main NavigationBar
-                                    if (self.appDelegate.activeMain.isSelectedMode == false && self.appDelegate.activeMain != nil) {
-                                        self.appDelegate.activeMain.setUINavigationBarDefault()
-                                    }
                                 }
-                            }
-                            
-                        } else {
-                            
-                            // Update Main NavigationBar
-                            if (self.appDelegate.activeMain.isSelectedMode == false && self.appDelegate.activeMain != nil) {
-                                self.appDelegate.activeMain.setUINavigationBarDefault()
                             }
                         }
-                    })
+                    }
                     
-                } else {
+                    // External file Server
+                    let isExternalSitesServerEnabled = NCManageDatabase.shared.getCapabilitiesServerBool(account: account, elements: NCElementsJSON.shared.capabilitiesExternalSitesExists, exists: true)
+                    if (isExternalSitesServerEnabled) {
+                        NCCommunication.shared.getExternalSite() { (account, externalSites, errorCode, errorDescription) in
+                            if errorCode == 0 && account == self.appDelegate.account {
+                                
+                                DispatchQueue.global().async {
+                                
+                                    NCManageDatabase.shared.deleteExternalSites(account: account)
+                                    for externalSite in externalSites {
+                                        NCManageDatabase.shared.addExternalSites(externalSite, account: account)
+                                    }
+                                }
+                            }
+                        }
+                        
+                    } else {
+                        NCManageDatabase.shared.deleteExternalSites(account: account)
+                    }
                     
-                    // Remove all Notification
-                    self.appDelegate.listOfNotifications.removeAllObjects()
-                    NotificationCenter.default.post(name: NSNotification.Name(rawValue: "notificationReloadData"), object: nil)
-                    // Update Main NavigationBar
-                    if (self.appDelegate.activeMain != nil && self.appDelegate.activeMain.isSelectedMode == false) {
-                        self.appDelegate.activeMain.setUINavigationBarDefault()
+                    // User Status
+                    let userStatus = NCManageDatabase.shared.getCapabilitiesServerBool(account: account, elements: NCElementsJSON.shared.capabilitiesUserStatusEnabled, exists: false)
+                    if userStatus {
+                        NCCommunication.shared.getUserStatus { (account, clearAt, icon, message, messageId, messageIsPredefined, status, statusIsUserDefined, userId, errorCode, errorDescription) in
+                            if errorCode == 0 && account == self.appDelegate.account && userId == self.appDelegate.userID {
+                                
+                                DispatchQueue.global().async {
+                                
+                                    NCManageDatabase.shared.setAccountUserStatus(userStatusClearAt: clearAt, userStatusIcon: icon, userStatusMessage: message, userStatusMessageId: messageId, userStatusMessageIsPredefined: messageIsPredefined, userStatusStatus: status, userStatusStatusIsUserDefined: statusIsUserDefined, account: account)
+                                }
+                            }
+                        }
+                    }
+                
+                    // Handwerkcloud
+                    let isHandwerkcloudEnabled = NCManageDatabase.shared.getCapabilitiesServerBool(account: account, elements: NCElementsJSON.shared.capabilitiesHWCEnabled, exists: false)
+                    if (isHandwerkcloudEnabled) {
+                        self.requestHC()
                     }
                 }
                 
-                // Get External Sites
-                if (capabilities!.isExternalSitesServerEnabled) {
-                    
-                    OCNetworking.sharedManager().getExternalSites(withAccount: account!, completion: { (account, listOfExternalSites, message, errorCode) in
-                        if errorCode == 0 && account == self.appDelegate.activeAccount {
-                            NCManageDatabase.sharedInstance.deleteExternalSites(account: account!)
-                            for externalSites in listOfExternalSites! {
-                                NCManageDatabase.sharedInstance.addExternalSites(externalSites as! OCExternalSites, account: account!)
-                            }
-                        } 
-                    })
-                   
-                } else {
-                    
-                    NCManageDatabase.sharedInstance.deleteExternalSites(account: account!)
-                }
-                
-                // Get Share Server
-                if (capabilities!.isFilesSharingAPIEnabled && self.appDelegate.activeMain != nil) {
-                    
-                    OCNetworking.sharedManager()?.readShare(withAccount: account, completion: { (account, items, message, errorCode) in
-                        if errorCode == 0 && account == self.appDelegate.activeAccount{
-                            let itemsOCSharedDto = items as! [OCSharedDto]
-                            NCManageDatabase.sharedInstance.deleteTableShare(account: account!)
-                            self.appDelegate.shares = NCManageDatabase.sharedInstance.addShare(account: account!, activeUrl: self.appDelegate.activeUrl, items: itemsOCSharedDto)
-                            self.appDelegate.activeMain?.tableView?.reloadData()
-                            self.appDelegate.activeFavorites?.tableView?.reloadData()
-                        } else {
-                            self.appDelegate.messageNotification("_share_", description: message, visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: errorCode)
-                        }
-                    })
-                }
-                
-                // Get Handwerkcloud
-                if (capabilities!.isHandwerkcloudEnabled) {
-                    self.requestHC()
-                }
-              
             } else if errorCode != 0 {
                 
-                self.appDelegate.settingThemingColorBrand()
+                NCBrandColor.shared.settingThemingColor(account: account)
                 
-                if errorCode == kOCErrorServerUnauthorized || errorCode == kOCErrorServerForbidden {
-                    OCNetworking.sharedManager()?.checkRemoteUser(account, function: "get capabilities", errorCode: errorCode)
+                if errorCode == 401 || errorCode == 403 {
+                    NCNetworkingCheckRemoteUser.shared.checkRemoteUser(account: account)
                 }
                 
             } else {
-                print("[LOG] It has been changed user during networking process, error.")
-                // Change Theming color
-                self.appDelegate.settingThemingColorBrand()
+                NCBrandColor.shared.settingThemingColor(account: account)
             }
-        })
-    }
-    
-    @objc public func middlewarePing() {
-        
-        if (appDelegate.activeAccount == nil || appDelegate.activeAccount.count == 0 || appDelegate.maintenanceMode == true) {
-            return
         }
     }
     
-    //MARK: -
-    //MARK: Thirt Part
+    @objc func synchronizeOffline(account: String) {
+        
+        // Synchronize Offline Directory
+        if let directories = NCManageDatabase.shared.getTablesDirectory(predicate: NSPredicate(format: "account == %@ AND offline == true", account), sorted: "serverUrl", ascending: true) {
+            for directory: tableDirectory in directories {
+                guard let metadata = NCManageDatabase.shared.getMetadataFromOcId(directory.ocId) else {
+                    continue
+                }
+                NCOperationQueue.shared.synchronizationMetadata(metadata, selector: NCBrandGlobal.shared.selectorDownloadFile)
+            }
+        }
+    
+        // Synchronize Offline Files
+        let files = NCManageDatabase.shared.getTableLocalFiles(predicate: NSPredicate(format: "account == %@ AND offline == true", account), sorted: "fileName", ascending: true)
+        for file: tableLocalFile in files {
+            guard let metadata = NCManageDatabase.shared.getMetadataFromOcId(file.ocId) else {
+                continue
+            }
+            NCOperationQueue.shared.synchronizationMetadata(metadata, selector: NCBrandGlobal.shared.selectorDownloadFile)
+        }
+    }
+   
+    //MARK: - Thirt Part
     
     private func requestHC() {
-        
-        let professions = CCUtility.getHCBusinessType()
-        if professions != nil && professions!.count > 0 {
-            OCNetworking.sharedManager()?.putHCUserProfile(withAccount: appDelegate.activeAccount, serverUrl: appDelegate.activeUrl, address: nil, businesssize: nil, businesstype: professions, city: nil, company: nil, country: nil, displayname: nil, email: nil, phone: nil, role_: nil, twitter: nil, website: nil, zip: nil, completion: { (account, message, errorCode) in
-                if errorCode == 0 && account == self.appDelegate.activeAccount {
-                    CCUtility.setHCBusinessType(nil)
-                    OCNetworking.sharedManager()?.getHCUserProfile(withAccount: self.appDelegate.activeAccount, serverUrl: self.appDelegate.activeUrl, completion: { (account, userProfile, message, errorCode) in
-                        if errorCode == 0 && account == self.appDelegate.activeAccount {
-                            _ = NCManageDatabase.sharedInstance.setAccountUserProfile(userProfile!, HCProperties: true)
-                        }
-                    })
-                }
-            })
-        } else {
-            OCNetworking.sharedManager()?.getHCUserProfile(withAccount: appDelegate.activeAccount, serverUrl: appDelegate.activeUrl, completion: { (account, userProfile, message, errorCode) in
-                if errorCode == 0 && account == self.appDelegate.activeAccount {
-                    _ = NCManageDatabase.sharedInstance.setAccountUserProfile(userProfile!, HCProperties: true)
-                }
-            })
-        }
-        
-        OCNetworking.sharedManager()?.getHCFeatures(withAccount: appDelegate.activeAccount, serverUrl: appDelegate.activeUrl, completion: { (account, features, message, errorCode) in
-            if errorCode == 0 && account == self.appDelegate.activeAccount {
-                _ = NCManageDatabase.sharedInstance.setAccountHCFeatures(features!)
-            }
-        })
-        
+
     }
 }

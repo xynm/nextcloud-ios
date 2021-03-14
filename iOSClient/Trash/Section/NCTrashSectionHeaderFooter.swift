@@ -36,47 +36,20 @@ class NCTrashSectionHeaderMenu: UICollectionReusableView {
     override func awakeFromNib() {
         super.awakeFromNib()
         
-        // Button More
-        /*
-        let capabilities = NCManageDatabase.sharedInstance.getCapabilites()
-        if capabilities != nil && capabilities!.versionMajor >= Int(k_trash_version_available_more_fix) {
-            buttonMore.isHidden = false
-        } else {
-            buttonMore.isHidden = true
-        }
-        */
-        
-        buttonSwitch.setImage(CCGraphics.changeThemingColorImage(UIImage.init(named: "switchList"), multiplier: 2, color: NCBrandColor.sharedInstance.icon), for: .normal)
+        buttonSwitch.setImage(UIImage.init(named: "switchList")!.image(color: NCBrandColor.shared.icon, size: 25), for: .normal)
         
         buttonOrder.setTitle("", for: .normal)
-        buttonOrder.setTitleColor(NCBrandColor.sharedInstance.icon, for: .normal)
+        buttonOrder.setTitleColor(NCBrandColor.shared.brandElement, for: .normal)
         
-        buttonMore.setImage(CCGraphics.changeThemingColorImage(UIImage.init(named: "more"), multiplier: 2, color: NCBrandColor.sharedInstance.icon), for: .normal)
+        buttonMore.setImage(UIImage.init(named: "more")!.image(color: NCBrandColor.shared.icon, size: 25), for: .normal)
         
-        separator.backgroundColor = NCBrandColor.sharedInstance.separator
-        backgroundColor = NCBrandColor.sharedInstance.backgroundView
+        separator.backgroundColor = NCBrandColor.shared.separator
+        backgroundColor = NCBrandColor.shared.backgroundView
     }
     
-    func setTitleOrder(datasourceSorted: String, datasourceAscending: Bool) {
+    func setTitleSorted(datasourceTitleButton: String) {
         
-        // Order (∨∧▽△)
-        var title = ""
-        
-        switch datasourceSorted {
-        case "fileName":
-            if datasourceAscending == true { title = NSLocalizedString("_order_by_name_a_z_", comment: "") }
-            if datasourceAscending == false { title = NSLocalizedString("_order_by_name_z_a_", comment: "") }
-        case "date":
-            if datasourceAscending == false { title = NSLocalizedString("_order_by_date_more_recent_", comment: "") }
-            if datasourceAscending == true { title = NSLocalizedString("_order_by_date_less_recent_", comment: "") }
-        case "size":
-            if datasourceAscending == true { title = NSLocalizedString("_order_by_size_smallest_", comment: "") }
-            if datasourceAscending == false { title = NSLocalizedString("_order_by_size_largest_", comment: "") }
-        default:
-            title = NSLocalizedString("_order_by_", comment: "") + " " + datasourceSorted
-        }
-        
-        title = title + "  ▽"
+        let title = NSLocalizedString(datasourceTitleButton, comment: "")
         let size = title.size(withAttributes:[.font: buttonOrder.titleLabel?.font as Any])
         
         buttonOrder.setTitle(title, for: .normal)
@@ -122,14 +95,14 @@ class NCTrashSectionFooter: UICollectionReusableView {
     override func awakeFromNib() {
         super.awakeFromNib()
         
-        labelFooter.textColor = NCBrandColor.sharedInstance.icon
+        labelFooter.textColor = NCBrandColor.shared.icon
     }
     
     func setTitleLabelFooter(datasource: [tableTrash]) {
         
         var folders: Int = 0, foldersText = ""
         var files: Int = 0, filesText = ""
-        var size: Double = 0
+        var size: Int64 = 0
         
         for record: tableTrash in datasource {
             if record.directory {

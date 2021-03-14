@@ -24,149 +24,93 @@
 import Foundation
 import SVGKit
 import KTVHTTPCache
-import ZIPFoundation
-import Sheeeeeeeeet
+import NCCommunication
+import PDFKit
+import Accelerate
 
 class NCUtility: NSObject {
-    @objc static let sharedInstance: NCUtility = {
+    @objc static let shared: NCUtility = {
         let instance = NCUtility()
         return instance
     }()
     
     let activityIndicator = UIActivityIndicatorView(style: .whiteLarge)
-    let cache = NSCache<NSString, UIImage>()
-    struct bundleDirectoryType {
-        var error: Bool = false
-        var bundleDirectory: String = ""
-        var immPath: String = ""
-    }
     
-    @objc func createFileName(_ fileName: String, serverUrl: String, account: String) -> String {
+    func setLayoutForView(key: String, serverUrl: String, layout: String, sort: String, ascending: Bool, groupBy: String, directoryOnTop: Bool, titleButton: String, itemForLine: Int) {
         
-        var resultFileName = fileName
-        var exitLoop = false
-            
-            while exitLoop == false {
-                
-                if NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileNameView == %@ AND serverUrl == %@ AND account == %@", resultFileName, serverUrl, account)) != nil {
-                    
-                    var name = NSString(string: resultFileName).deletingPathExtension
-                    let ext = NSString(string: resultFileName).pathExtension
-                    
-                    let characters = Array(name)
-                    
-                    if characters.count < 2 {
-                        resultFileName = name + " " + "1" + "." + ext
-                    } else {
-                        let space = characters[characters.count-2]
-                        let numChar = characters[characters.count-1]
-                        var num = Int(String(numChar))
-                        if (space == " " && num != nil) {
-                            name = String(name.dropLast())
-                            num = num! + 1
-                            resultFileName = name + "\(num!)" + "." + ext
-                        } else {
-                            resultFileName = name + " " + "1" + "." + ext
-                        }
-                    }
-                    
-                } else {
-                    exitLoop = true
-                }
+        let string =  layout + "|" + sort + "|" + "\(ascending)" + "|" + groupBy + "|" + "\(directoryOnTop)" + "|" + titleButton + "|" + "\(itemForLine)"
+        var keyStore = key
+        
+        if serverUrl != "" {
+            keyStore = serverUrl
         }
         
-        return resultFileName
+        UICKeyChainStore.setString(string, forKey: keyStore, service: NCBrandGlobal.shared.serviceShareKeyChain)
     }
     
-    @objc func isEncryptedMetadata(_ metadata: tableMetadata) -> Bool {
+    func setLayoutForView(key: String, serverUrl: String, layout: String) {
         
-        if metadata.fileName != metadata.fileNameView && metadata.fileName.count == 32 && metadata.fileName.contains(".") == false {
-            return true
+        var sort: String
+        var ascending: Bool
+        var groupBy: String
+        var directoryOnTop: Bool
+        var titleButton: String
+        var itemForLine: Int
+
+        (_, sort, ascending, groupBy, directoryOnTop, titleButton, itemForLine) = NCUtility.shared.getLayoutForView(key: NCBrandGlobal.shared.layoutViewFavorite, serverUrl: serverUrl)
+
+        setLayoutForView(key: key, serverUrl: serverUrl, layout: layout, sort: sort, ascending: ascending, groupBy: groupBy, directoryOnTop: directoryOnTop, titleButton: titleButton, itemForLine: itemForLine)
+    }
+    
+    @objc func getLayoutForView(key: String, serverUrl: String) -> (String) {
+        
+        var layout: String
+        (layout, _, _, _, _, _, _) = NCUtility.shared.getLayoutForView(key: key, serverUrl: serverUrl)
+        return layout
+    }
+    
+    @objc func getSortedForView(key: String, serverUrl: String) -> (String) {
+        
+        var sort: String
+        (_, sort, _, _, _, _, _) = NCUtility.shared.getLayoutForView(key: key, serverUrl: serverUrl)
+        return sort
+    }
+    
+    @objc func getAscendingForView(key: String, serverUrl: String) -> (Bool) {
+        
+        var ascending: Bool
+        (_, _, ascending, _, _, _, _) = NCUtility.shared.getLayoutForView(key: key, serverUrl: serverUrl)
+        return ascending
+    }
+    
+    func getLayoutForView(key: String, serverUrl: String) -> (layout: String, sort: String, ascending: Bool, groupBy: String, directoryOnTop: Bool, titleButton: String, itemForLine: Int) {
+        
+        var keyStore = key
+        
+        if serverUrl != "" {
+            keyStore = serverUrl
         }
         
-        return false
-    }
-    
-    @objc func getFileSize(asset: PHAsset) -> Int64 {
-        
-        let resources = PHAssetResource.assetResources(for: asset)
-        
-        if let resource = resources.first {
-            if resource.responds(to: #selector(NSDictionary.fileSize)) {
-                let unsignedInt64 = resource.value(forKey: "fileSize") as! CLong
-                return Int64(bitPattern: UInt64(unsignedInt64))
-            }
-        }
-        
-        return 0
-    }
-    
-    @objc func getScreenWidthForPreview() -> CGFloat {
-        
-        let screenSize = UIScreen.main.bounds
-        let screenWidth = screenSize.width * 0.75
-        
-        return screenWidth
-    }
-    
-    @objc func getScreenHeightForPreview() -> CGFloat {
-        
-        let screenSize = UIScreen.main.bounds
-        let screenWidth = screenSize.height * 0.75
-        
-        return screenWidth
-    }
-    
-    @objc func resizeImage(image: UIImage, newWidth: CGFloat) -> UIImage {
-        
-        let scale = newWidth / image.size.width
-        let newHeight = image.size.height * scale
-        UIGraphicsBeginImageContext(CGSize(width: newWidth, height: newHeight))
-        image.draw(in: (CGRect(x: 0, y: 0, width: newWidth, height: newHeight)))
-        let newImage = UIGraphicsGetImageFromCurrentImageContext()!
-        UIGraphicsEndImageContext()
-        
-        return newImage
-    }
-    
-    func cellBlurEffect(with frame: CGRect) -> UIView {
-        
-        let blurEffect = UIBlurEffect(style: .extraLight)
-        let blurEffectView = UIVisualEffectView(effect: blurEffect)
-        
-        blurEffectView.frame = frame
-        blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        blurEffectView.backgroundColor = NCBrandColor.sharedInstance.brand.withAlphaComponent(0.2)
-        
-        return blurEffectView
-    }
-    
-    func setLayoutForView(key: String, layout: String, sort: String, ascending: Bool, groupBy: String, directoryOnTop: Bool) {
-        
-        let string =  layout + "|" + sort + "|" + "\(ascending)" + "|" + groupBy + "|" + "\(directoryOnTop)"
-        
-        UICKeyChainStore.setString(string, forKey: key, service: k_serviceShareKeyChain)
-    }
-    
-    func getLayoutForView(key: String) -> (String, String, Bool, String, Bool) {
-        
-        guard let string = UICKeyChainStore.string(forKey: key, service: k_serviceShareKeyChain) else {
-            return (k_layout_list, "fileName", true, "none", true)
+        guard let string = UICKeyChainStore.string(forKey: keyStore, service: NCBrandGlobal.shared.serviceShareKeyChain) else {
+            setLayoutForView(key: key, serverUrl: serverUrl, layout: NCBrandGlobal.shared.layoutList, sort: "fileName", ascending: true, groupBy: "none", directoryOnTop: true, titleButton: "_sorted_by_name_a_z_", itemForLine: 3)
+            return (NCBrandGlobal.shared.layoutList, "fileName", true, "none", true, "_sorted_by_name_a_z_", 3)
         }
 
         let array = string.components(separatedBy: "|")
-        if array.count == 5 {
+        if array.count == 7 {
             let sort = NSString(string: array[2])
             let directoryOnTop = NSString(string: array[4])
+            let itemForLine = NSString(string: array[6])
 
-            return (array[0], array[1], sort.boolValue, array[3], directoryOnTop.boolValue)
+            return (array[0], array[1], sort.boolValue, array[3], directoryOnTop.boolValue, array[5], Int(itemForLine.intValue))
         }
         
-        return (k_layout_list, "fileName", true, "none", true)
+        setLayoutForView(key: key, serverUrl: serverUrl, layout: NCBrandGlobal.shared.layoutList, sort: "fileName", ascending: true, groupBy: "none", directoryOnTop: true, titleButton: "_sorted_by_name_a_z_", itemForLine: 3)
+        
+        return (NCBrandGlobal.shared.layoutList, "fileName", true, "none", true, "_sorted_by_name_a_z_", 3)
     }
-    
-    
-    func convertSVGtoPNGWriteToUserData(svgUrlString: String, fileName: String?, width: CGFloat?, rewrite: Bool, closure: @escaping (String?) -> ()) {
+        
+    func convertSVGtoPNGWriteToUserData(svgUrlString: String, fileName: String?, width: CGFloat?, rewrite: Bool, account: String, closure: @escaping (String?) -> ()) {
         
         var fileNamePNG = ""
         
@@ -187,8 +131,8 @@ class NCUtility: NSObject {
         
         if !FileManager.default.fileExists(atPath: imageNamePath) || rewrite == true {
             
-            OCNetworking.sharedManager()?.downloadContents(ofUrl: iconURL.absoluteString, completion: { (data, message, errorCode) in
-                
+            NCCommunication.shared.downloadContent(serverUrl: iconURL.absoluteString) { (account, data, errorCode, errorMessage) in
+               
                 if errorCode == 0 && data != nil {
                 
                     if let image = UIImage.init(data: data!) {
@@ -213,7 +157,7 @@ class NCUtility: NSObject {
                             return closure(nil)
                         }
                         
-                        CCUtility.write(pngImageData, fileNamePath: imageNamePath)
+                        try? pngImageData.write(to: URL(fileURLWithPath:imageNamePath))
                         
                         return closure(imageNamePath)
                         
@@ -235,25 +179,25 @@ class NCUtility: NSObject {
                             return closure(nil)
                         }
                             
-                        CCUtility.write(pngImageData, fileNamePath: imageNamePath)
-                            
+                        try? pngImageData.write(to: URL(fileURLWithPath:imageNamePath))
+                                                    
                         return closure(imageNamePath)
                     }
                 } else {
                     return closure(nil)
                 }
-            })
+            }
             
         } else {
             return closure(imageNamePath)
         }
     }
     
-    @objc func startActivityIndicator(view: UIView?, bottom: CGFloat) {
+    @objc func startActivityIndicator(view: UIView?, bottom: CGFloat = 0) {
     
         guard let view = view else { return }
         
-        activityIndicator.color = NCBrandColor.sharedInstance.brand
+        activityIndicator.color = NCBrandColor.shared.brand
         activityIndicator.hidesWhenStopped = true
             
         view.addSubview(activityIndicator)
@@ -285,76 +229,14 @@ class NCUtility: NSObject {
         }
         return path.contains("CoreSimulator") || path.contains("sandboxReceipt")
     }
-    
-    @objc func isEditImage(_ fileName: NSString) -> String? {
-        switch fileName.pathExtension.uppercased() {
-        case "PNG":
-            return "PNG";
-        case "JPG":
-            return "JPG";
-        case "JPEG":
-            return "JPG"
-        default:
-            return nil
-        }
-    }
-    
-    @objc func formatSecondsToString(_ seconds: TimeInterval) -> String {
-        if seconds.isNaN {
-            return "00:00:00"
-        }
-        let sec = Int(seconds.truncatingRemainder(dividingBy: 60))
-        let min = Int(seconds.truncatingRemainder(dividingBy: 3600) / 60)
-        let hour = Int(seconds / 3600)
-        return String(format: "%02d:%02d:%02d", hour, min, sec)
-    }
-    
-    @objc func blink(cell: AnyObject?) {
-        DispatchQueue.main.async {
-            if let cell = cell as? UITableViewCell {
-                cell.backgroundColor = NCBrandColor.sharedInstance.brand.withAlphaComponent(0.3)
-                UIView.animate(withDuration: 2) {
-                    cell.backgroundColor = .clear
-                }
-            } else if let cell = cell as? UICollectionViewCell {
-                cell.backgroundColor = NCBrandColor.sharedInstance.brand.withAlphaComponent(0.3)
-                UIView.animate(withDuration: 2) {
-                    cell.backgroundColor = .clear
-                }
-            }
-        }
-    }
-    
-    @objc func bestFittingFont(for text: String, in bounds: CGRect, fontDescriptor: UIFontDescriptor) -> UIFont {
-        
-        let constrainingDimension = min(bounds.width, bounds.height)
-        let properBounds = CGRect(origin: .zero, size: bounds.size)
-        var attributes = [NSAttributedString.Key: Any]()
-        
-        let infiniteBounds = CGSize(width: CGFloat.infinity, height: CGFloat.infinity)
-        var bestFontSize: CGFloat = constrainingDimension
-        
-        for fontSize in stride(from: bestFontSize, through: 0, by: -1) {
-            let newFont = UIFont(descriptor: fontDescriptor, size: fontSize)
-            attributes[.font] = newFont
-            
-            let currentFrame = text.boundingRect(with: infiniteBounds, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil)
-            
-            if properBounds.contains(currentFrame) {
-                bestFontSize = fontSize
-                break
-            }
-        }
-        
-        return UIFont(descriptor: fontDescriptor, size: bestFontSize)
-    }
-    
+
     @objc func isRichDocument(_ metadata: tableMetadata) -> Bool {
         
         guard let mimeType = CCUtility.getMimeType(metadata.fileNameView) else {
             return false
         }
-        guard let richdocumentsMimetypes = NCManageDatabase.sharedInstance.getRichdocumentsMimetypes(account: metadata.account) else {
+        
+        guard let richdocumentsMimetypes = NCManageDatabase.shared.getCapabilitiesServerArray(account: metadata.account, elements: NCElementsJSON.shared.capabilitiesRichdocumentsMimetypes) else {
             return false
         }
         
@@ -373,101 +255,207 @@ class NCUtility: NSObject {
         return false
     }
     
+    @objc func isDirectEditing(account: String, contentType: String) -> String? {
+        
+        var editor: String?
+        
+        guard let results = NCManageDatabase.shared.getDirectEditingEditors(account: account) else {
+            return editor
+        }
+        
+        for result: tableDirectEditingEditors in results {
+            for mimetype in result.mimetypes {
+                if mimetype == contentType {
+                    editor = result.editor
+                }
+                // HARDCODE
+                // https://github.com/nextcloud/text/issues/913
+                if mimetype == "text/markdown" && contentType == "text/x-markdown" {
+                    editor = result.editor
+                }
+            }
+            for mimetype in result.optionalMimetypes {
+                if mimetype == contentType {
+                    editor = result.editor
+                }
+            }
+        }
+        
+        // HARDCODE
+        if editor == "" {
+            editor = NCBrandGlobal.shared.editorText
+        }
+        
+        return editor
+    }
+    
     @objc func removeAllSettings() {
         
         URLCache.shared.memoryCapacity = 0
         URLCache.shared.diskCapacity = 0
         KTVHTTPCache.cacheDeleteAllCaches()
         
-        NCManageDatabase.sharedInstance.clearDatabase(account: nil, removeAccount: true)
+        NCManageDatabase.shared.clearDatabase(account: nil, removeAccount: true)
         
-        CCUtility.emptyGroupDirectoryProviderStorage()
-        CCUtility.emptyGroupLibraryDirectory()
+        CCUtility.removeGroupDirectoryProviderStorage()
+        CCUtility.removeGroupLibraryDirectory()
         
-        CCUtility.emptyDocumentsDirectory()
-        CCUtility.emptyTemporaryDirectory()
+        CCUtility.removeDocumentsDirectory()
+        CCUtility.removeTemporaryDirectory()
         
         CCUtility.createDirectoryStandard()
         
         CCUtility.deleteAllChainStore()
     }
     
-    @objc func createAvatar(fileNameSource: String, fileNameSourceAvatar: String) -> UIImage? {
+    @objc func permissionsContainsString(_ metadataPermissions: String, permissions: String) -> Bool {
         
-        guard let imageSource = UIImage(contentsOfFile: fileNameSource) else { return nil }
-        let size = Int(k_avatar_size) ?? 128
-        
-        UIGraphicsBeginImageContextWithOptions(CGSize(width: size, height: size), false, 0)
-        imageSource.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
-        let image = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-
-        UIGraphicsBeginImageContextWithOptions(CGSize(width: size, height: size), false, 0)
-        let avatarImageView = CCAvatar.init(image: image, borderColor: .lightGray, borderWidth: 0.5)
-        //avatarImageView?.alpha = alpha
-        guard let context = UIGraphicsGetCurrentContext() else { return nil }
-        avatarImageView?.layer.render(in: context)
-        guard let imageAvatar = UIGraphicsGetImageFromCurrentImageContext() else { return nil }
-        UIGraphicsEndImageContext()
-        
-        guard let data = imageAvatar.pngData() else {
-            return nil
-        }
-        do {
-            try data.write(to: NSURL(fileURLWithPath: fileNameSourceAvatar) as URL, options: .atomic)
-        } catch { }
-        
-        return imageAvatar
-    }
-    
-    func loadImage(ocId: String, fileNameView: String, completion: @escaping (UIImage?) -> Void) {
-        
-        if let image = cache.object(forKey: ocId as NSString) {
-            completion(image)
-            return
-        }
-        
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            
-            let loadedImage = UIImage(contentsOfFile: CCUtility.getDirectoryProviderStorageIconOcId(ocId, fileNameView: fileNameView))
-            
-            DispatchQueue.main.async {
-                
-                if let loadedImage = loadedImage {
-                    self?.cache.setObject(loadedImage, forKey: ocId as NSString)
-                }
-                completion(loadedImage)
+        for char in permissions {
+            if metadataPermissions.contains(char) == false {
+                return false
             }
         }
+        return true
     }
     
-    func IMGetBundleDirectory(metadata: tableMetadata) -> bundleDirectoryType {
+    @objc func getCustomUserAgentOnlyOffice() -> String {
         
-        var error = true
-        var bundleDirectory = ""
-        var immPath = ""
+        let appVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")!
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return "Mozilla/5.0 (iPad) Nextcloud-iOS/\(appVersion)"
+        }else{
+            return "Mozilla/5.0 (iPhone) Mobile Nextcloud-iOS/\(appVersion)"
+        }
+    }
+    
+    @objc func pdfThumbnail(url: URL, width: CGFloat = 240) -> UIImage? {
+       
+        guard let data = try? Data(contentsOf: url), let page = PDFDocument(data: data)?.page(at: 0) else {
+            return nil
+        }
+
+        let pageSize = page.bounds(for: .mediaBox)
+        let pdfScale = width / pageSize.width
+
+        // Apply if you're displaying the thumbnail on screen
+        let scale = UIScreen.main.scale * pdfScale
+        let screenSize = CGSize(width: pageSize.width * scale, height: pageSize.height * scale)
+
+        return page.thumbnail(of: screenSize, for: .mediaBox)
+    }
+    
+    @objc func isQuickLookDisplayable(metadata: tableMetadata) -> Bool {
+        return true
+    }
         
-        let source = URL(fileURLWithPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView))
+    @objc func ocIdToFileId(ocId: String?) -> String? {
+    
+        guard let ocId = ocId else { return nil }
         
-        if let archive = Archive(url: source, accessMode: .read) {
-            archive.forEach({ (entry) in
-                let pathComponents = (entry.path as NSString).pathComponents
-                if pathComponents.count == 2 && (pathComponents.last! as NSString).pathExtension.lowercased() == "imm" {
-                    error = false
-                    bundleDirectory = CCUtility.getDirectoryProviderStorageOcId(metadata.ocId) + "/" + pathComponents.first!
-                    immPath = CCUtility.getDirectoryProviderStorageOcId(metadata.ocId) + "/" + entry.path
-                }
-            })
+        let items = ocId.components(separatedBy: "oc")
+        if items.count < 2 { return nil }
+        guard let intFileId = Int(items[0]) else { return nil }
+        return String(intFileId)
+    }
+    
+    func getUserStatus(userIcon: String?, userStatus: String?, userMessage: String?) -> (onlineStatus: UIImage?, statusMessage: String) {
+        
+        var onlineStatus: UIImage?
+        var statusMessage: String = ""
+        var messageUserDefined: String = ""
+        
+        if userStatus?.lowercased() == "online" {
+            onlineStatus = UIImage.init(named: "userStatusOnline")!.image(color: UIColor(red: 103.0/255.0, green: 176.0/255.0, blue: 134.0/255.0, alpha: 1.0), size: 50)
+            messageUserDefined = NSLocalizedString("_online_", comment: "")
+        }
+        if userStatus?.lowercased() == "away" {
+            onlineStatus = UIImage.init(named: "userStatusAway")!.image(color: UIColor(red: 233.0/255.0, green: 166.0/255.0, blue: 75.0/255.0, alpha: 1.0), size: 50)
+            messageUserDefined = NSLocalizedString("_away_", comment: "")
+        }
+        if userStatus?.lowercased() == "dnd" {
+            onlineStatus = UIImage.init(named: "userStatusDnd")?.resizeImage(size: CGSize(width: 100, height: 100), isAspectRation: false)
+            messageUserDefined = NSLocalizedString("_dnd_", comment: "")
+        }
+        if userStatus?.lowercased() == "offline" || userStatus?.lowercased() == "invisible"  {
+            onlineStatus = UIImage.init(named: "userStatusOffline")!.image(color: .black, size: 50) 
+            messageUserDefined = NSLocalizedString("_invisible_", comment: "")
         }
         
-        return bundleDirectoryType(error: error, bundleDirectory: bundleDirectory, immPath: immPath)
+        if let userIcon = userIcon {
+            statusMessage = userIcon + " "
+        }
+        if let userMessage = userMessage {
+            statusMessage = statusMessage + userMessage
+        }
+        statusMessage = statusMessage.trimmingCharacters(in: .whitespaces)
+        if statusMessage == "" {
+            statusMessage = messageUserDefined
+        }
+                
+        return(onlineStatus, statusMessage)
+    }
+    
+    func imageFromVideo(url: URL, at time: TimeInterval) -> UIImage? {
+        
+        let asset = AVURLAsset(url: url)
+        let assetIG = AVAssetImageGenerator(asset: asset)
+        
+        assetIG.appliesPreferredTrackTransform = true
+        assetIG.apertureMode = AVAssetImageGenerator.ApertureMode.encodedPixels
+
+        let cmTime = CMTime(seconds: time, preferredTimescale: 60)
+        let thumbnailImageRef: CGImage
+        do {
+            thumbnailImageRef = try assetIG.copyCGImage(at: cmTime, actualTime: nil)
+        } catch let error {
+            print("Error: \(error)")
+            return nil
+        }
+
+        return UIImage(cgImage: thumbnailImageRef)
+    }
+    
+    func createImageFrom(fileName: String, ocId: String, etag: String, typeFile: String) {
+        
+        var originalImage, scaleImagePreview, scaleImageIcon: UIImage?
+        
+        let fileNamePath = CCUtility.getDirectoryProviderStorageOcId(ocId, fileNameView: fileName)!
+        let fileNamePathPreview = CCUtility.getDirectoryProviderStoragePreviewOcId(ocId, etag: etag)!
+        let fileNamePathIcon = CCUtility.getDirectoryProviderStorageIconOcId(ocId, etag: etag)!
+        
+        if FileManager().fileExists(atPath: fileNamePathPreview) && FileManager().fileExists(atPath: fileNamePathIcon) { return }
+        if !CCUtility.fileProviderStorageExists(ocId, fileNameView: fileName) { return }
+        if typeFile != NCBrandGlobal.shared.metadataTypeFileImage && typeFile != NCBrandGlobal.shared.metadataTypeFileVideo { return }
+        
+        if typeFile == NCBrandGlobal.shared.metadataTypeFileImage {
+            
+            originalImage = UIImage.init(contentsOfFile: fileNamePath)
+            
+            scaleImagePreview = originalImage?.resizeImage(size: CGSize(width: NCBrandGlobal.shared.sizePreview, height: NCBrandGlobal.shared.sizePreview), isAspectRation: false)
+            scaleImageIcon = originalImage?.resizeImage(size: CGSize(width: NCBrandGlobal.shared.sizeIcon, height: NCBrandGlobal.shared.sizeIcon), isAspectRation: false)
+            
+            try? scaleImagePreview?.jpegData(compressionQuality: 0.7)?.write(to: URL(fileURLWithPath: fileNamePathPreview))
+            try? scaleImageIcon?.jpegData(compressionQuality: 0.7)?.write(to: URL(fileURLWithPath: fileNamePathIcon))
+            
+        } else if typeFile == NCBrandGlobal.shared.metadataTypeFileVideo {
+            
+            let videoPath = NSTemporaryDirectory()+"tempvideo.mp4"
+            NCUtilityFileSystem.shared.linkItem(atPath: fileNamePath, toPath: videoPath)
+            
+            originalImage = imageFromVideo(url: URL(fileURLWithPath: videoPath), at: 0)
+            
+            try? originalImage?.jpegData(compressionQuality: 0.7)?.write(to: URL(fileURLWithPath: fileNamePathPreview))
+            try? originalImage?.jpegData(compressionQuality: 0.7)?.write(to: URL(fileURLWithPath: fileNamePathIcon))
+        }
+    }
+    
+    @objc func getVersionApp() -> String {
+        if let dictionary = Bundle.main.infoDictionary {
+            if let version = dictionary["CFBundleShortVersionString"], let build = dictionary["CFBundleVersion"] {
+                return "\(version).\(build)"
+            }
+        }
+        return ""
     }
 }
 
-class ActionSheetDeleteItem: ActionSheetItem {
-    override open func cell(for tableView: UITableView) -> ActionSheetItemCell {
-        return ActionSheetDeleteItemCell(style: cellStyle, reuseIdentifier: cellReuseIdentifier)
-    }
-}
-
-class ActionSheetDeleteItemCell: ActionSheetItemCell {}

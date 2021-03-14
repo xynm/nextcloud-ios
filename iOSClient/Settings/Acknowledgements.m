@@ -3,7 +3,7 @@
 //  Nextcloud
 //
 //  Created by Marino Faggiana on 14/11/14.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2014 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -38,26 +38,15 @@
     
     appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
 
-    NSURL *rtfPath;
-    
-    //NSString * language = [[NSLocale preferredLanguages] objectAtIndex:0];
-    //if ([language isEqualToString:@"it"]) rtfPath = [[NSBundle mainBundle]  URLForResource:@"terminicondizioni_it" withExtension:@"rtf"];
-    //else rtfPath = [[NSBundle mainBundle]  URLForResource:@"terminicondizioni_en" withExtension:@"rtf"];
-    
-    rtfPath = [[NSBundle mainBundle]  URLForResource:@"Acknowledgements" withExtension:@"rtf"];
+    NSURL *rtfPath = [[NSBundle mainBundle]  URLForResource:@"Acknowledgements" withExtension:@"rtf"];
     
     NSAttributedString *attributedStringWithRtf = [[NSAttributedString alloc] initWithURL:rtfPath options:@{NSDocumentTypeDocumentAttribute:NSRTFTextDocumentType} documentAttributes:nil error:nil];
     self.txtTermini.attributedText = attributedStringWithRtf;
     
-    self.automaticallyAdjustsScrollViewInsets = NO;
     self.view.backgroundColor = [UIColor whiteColor];
     self.title = NSLocalizedString(@"_acknowledgements_", nil);
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(cancelPressed)];
     self.txtTermini.hidden = true;
-    
-    // changeTheming
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(changeTheming) name:@"changeTheming" object:nil];
-    [self changeTheming];
 }
 
 - (void)viewDidAppear:(BOOL)animated
@@ -66,11 +55,6 @@
     
     [self.txtTermini setContentOffset:CGPointZero animated:NO];
     self.txtTermini.hidden = false;
-}
-
-- (void)changeTheming
-{
-    [appDelegate changeTheming:self tableView:nil collectionView:nil form:false];
 }
 
 - (void)cancelPressed

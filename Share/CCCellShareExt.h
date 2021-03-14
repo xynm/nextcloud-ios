@@ -3,7 +3,7 @@
 //  Nextcloud iOS
 //
 //  Created by Marino Faggiana on 27/01/16.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2016 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -26,7 +26,8 @@
 @interface CCCellShareExt : UITableViewCell
 
 @property(nonatomic, weak) IBOutlet UIImageView *fileImageView;
-@property(nonatomic, weak) IBOutlet UILabel *labelInformazioni;
+@property(nonatomic, weak) IBOutlet UITextField *fileName;
+@property(nonatomic, weak) IBOutlet UILabel *info;
 
 //Last position of the scroll of the swipe
 @property (nonatomic, assign) CGFloat lastContentOffset;

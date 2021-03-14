@@ -23,16 +23,15 @@
 
 import UIKit
 
-@available(iOS 11, *)
-
+@available(iOS 13.0, *)
 class DragDropViewController: UIViewController {
     
     //Data Source for collectionViewSource
-    private var itemsSource = [String]()
+    private var itemsSource: [String] = []
     
     //Data Source for collectionViewDestination
-    private var imagesDestination = [UIImage]()
-    private var itemsDestination = [String]()
+    private var imagesDestination: [UIImage] = []
+    private var itemsDestination: [String] = []
     
     //AppDelegate
     private let appDelegate = UIApplication.shared.delegate as! AppDelegate
@@ -61,7 +60,6 @@ class DragDropViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        
         collectionViewSource.dragInteractionEnabled = true
         collectionViewSource.dragDelegate = self
         collectionViewSource.dropDelegate = self
@@ -80,40 +78,32 @@ class DragDropViewController: UIViewController {
         segmentControlFilter.setTitle(NSLocalizedString("_filter_grayscale_", comment: ""), forSegmentAt: 1)
         segmentControlFilter.setTitle(NSLocalizedString("_filter_bn_", comment: ""), forSegmentAt: 2)
 
-        add.setImage(CCGraphics.changeThemingColorImage(UIImage(named: "add"), multiplier:2, color: NCBrandColor.sharedInstance.brand), for: .normal)
-        transferDown.setImage(CCGraphics.changeThemingColorImage(UIImage(named: "transferDown"), multiplier:2, color: NCBrandColor.sharedInstance.brand), for: .normal)
+        add.setImage(UIImage(named: "add")?.image(color: NCBrandColor.shared.brandElement, size: 25), for: .normal)
+        transferDown.setImage(UIImage(named: "transferDown")?.image(color: NCBrandColor.shared.brandElement, size: 25), for: .normal)
         
         let longPressRecognizer = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPressGesture(recognizer:)))
-        add.addGestureRecognizer(longPressRecognizer)
+        collectionViewSource.addGestureRecognizer(longPressRecognizer)
+        let longPressRecognizerPlus = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPressGesture(recognizer:)))
+        add.addGestureRecognizer(longPressRecognizerPlus)
         
         // changeTheming
-        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(changeTheming), name: NSNotification.Name(rawValue: NCBrandGlobal.shared.notificationCenterChangeTheming), object: nil)
+        
         changeTheming()
-    }
-    
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-                
-        labelTitlePDFzone.textColor = NCBrandColor.sharedInstance.brandText
-        labelTitlePDFzone.backgroundColor = NCBrandColor.sharedInstance.brand
         
-        segmentControlFilter.tintColor = NCBrandColor.sharedInstance.brand
-        
-        // Save button
-        if imagesDestination.count == 0 {
-            save.isEnabled = false
-        } else {
-            save.isEnabled = true
-        }
-        
-        loadImage(atPath: CCUtility.getDirectoryScan(), items: &itemsSource)
+        loadImage()
     }
     
     @objc func changeTheming() {
-        appDelegate.changeTheming(self, tableView: nil, collectionView: nil, form: true)
-        
-        collectionViewSource.backgroundColor = NCBrandColor.sharedInstance.backgroundForm
-        collectionViewDestination.backgroundColor = NCBrandColor.sharedInstance.backgroundForm
+        view.backgroundColor = NCBrandColor.shared.backgroundForm
+
+        collectionViewSource.backgroundColor = NCBrandColor.shared.backgroundForm
+        collectionViewDestination.backgroundColor = NCBrandColor.shared.backgroundForm
+        collectionViewSource.reloadData()
+        collectionViewDestination.reloadData()
+
+        labelTitlePDFzone.textColor = NCBrandColor.shared.textView
+        labelTitlePDFzone.backgroundColor = .systemBackground
     }
     
     //MARK: Button Action
@@ -126,20 +116,25 @@ class DragDropViewController: UIViewController {
         
         if imagesDestination.count > 0 {
             
-            var images = [UIImage]()
+            var images: [UIImage] = []
+            var serverUrl = appDelegate.activeServerUrl!
 
             for image in imagesDestination {
                 images.append(filter(image: image)!)
             }
             
-            let formViewController = NCCreateFormUploadScanDocument.init(serverUrl: appDelegate.activeMain.serverUrl, arrayImages: images)
+            if let directory = CCUtility.getDirectoryScanDocuments() {
+                serverUrl = directory
+            }
+            
+            let formViewController = NCCreateFormUploadScanDocument.init(serverUrl: serverUrl, arrayImages: images)
             self.navigationController?.pushViewController(formViewController, animated: true)
         }
     }
     
     @IBAction func add(sender: UIButton) {
         
-        NCCreateScanDocument.sharedInstance.openScannerDocument(viewController: self, openScan: false)
+        NCCreateScanDocument.shared.openScannerDocument(viewController: self)
     }
     
     @IBAction func transferDown(sender: UIButton) {
@@ -185,27 +180,35 @@ class DragDropViewController: UIViewController {
         collectionViewDestination.reloadData()
     }
     
-    //MARK: Private Methods
-    
-    private func loadImage(atPath: String, items: inout [String]) {
+    func loadImage() {
         
-        items.removeAll()
+        itemsSource.removeAll()
 
         do {
+            let atPath = CCUtility.getDirectoryScan()!
             let directoryContents = try FileManager.default.contentsOfDirectory(atPath: atPath)
             for fileName in directoryContents {
                 if fileName.first != "." {
-                    items.append(fileName)
+                    itemsSource.append(fileName)
                 }
             }
         } catch {
             print(error.localizedDescription)
         }
         
-        items = items.sorted()
+        itemsSource = itemsSource.sorted()
         
         collectionViewSource.reloadData()
+        
+        // Save button
+        if imagesDestination.count == 0 {
+            save.isEnabled = false
+        } else {
+            save.isEnabled = true
+        }
     }
+    
+    //MARK: Private Methods
     
     func filter(image: UIImage) -> UIImage? {
         
@@ -287,7 +290,7 @@ class DragDropViewController: UIViewController {
     {
         collectionView.performBatchUpdates({
             
-            var indexPaths = [IndexPath]()
+            var indexPaths: [IndexPath] = []
             
             for (index, item) in coordinator.items.enumerated() {
                 
@@ -353,10 +356,10 @@ class DragDropViewController: UIViewController {
         
         if pasteboard.hasImages {
             
-            let fileName = CCUtility.createFileName("scan.png", fileDate: Date(), fileType: PHAssetMediaType.image, keyFileName: k_keyFileNameMask, keyFileNameType: k_keyFileNameType, keyFileNameOriginal: k_keyFileNameOriginal)!
+            let fileName = CCUtility.createFileName("scan.png", fileDate: Date(), fileType: PHAssetMediaType.image, keyFileName: NCBrandGlobal.shared.keyFileNameMask, keyFileNameType: NCBrandGlobal.shared.keyFileNameType, keyFileNameOriginal: NCBrandGlobal.shared.keyFileNameOriginal)!
             let fileNamePath = CCUtility.getDirectoryScan() + "/" + fileName
             
-            guard let image = pasteboard.image else {
+            guard let image = pasteboard.image?.fixedOrientation() else {
                 return
             }
             
@@ -365,16 +368,15 @@ class DragDropViewController: UIViewController {
             } catch {
                 return
             }
-            
-            loadImage(atPath: CCUtility.getDirectoryScan(), items: &itemsSource)
+
+            loadImage()
         }
     }
 }
 
 // MARK: - UICollectionViewDataSource Methods
 
-@available(iOS 11, *)
-
+@available(iOS 13.0, *)
 extension DragDropViewController : UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -403,7 +405,7 @@ extension DragDropViewController : UICollectionViewDataSource {
             
             // 72 DPI
             if imageWidthInPixels > 595 || imageHeightInPixels > 842  {
-                image = CCGraphics.scale(image, to: CGSize(width: 595, height: 842), isAspectRation: true)
+                image = image.resizeImage(size: CGSize(width: 595, height: 842), isAspectRation: true) ?? image
             }
             
             cell.customImageView?.image = image
@@ -422,7 +424,7 @@ extension DragDropViewController : UICollectionViewDataSource {
             
             // 72 DPI 
             if imageWidthInPixels > 595 || imageHeightInPixels > 842  {
-                image = CCGraphics.scale(image, to: CGSize(width: 595, height: 842), isAspectRation: true)
+                image = image.resizeImage(size: CGSize(width: 595, height: 842), isAspectRation: true) ?? image
             }
             
             cell.customImageView?.image = self.filter(image: image)
@@ -502,8 +504,7 @@ extension UIImage {
 
 // MARK: - UICollectionViewDragDelegate Methods
 
-@available(iOS 11, *)
-
+@available(iOS 13.0, *)
 extension DragDropViewController : UICollectionViewDragDelegate
 {
     func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
@@ -565,8 +566,7 @@ extension DragDropViewController : UICollectionViewDragDelegate
 
 // MARK: - UICollectionViewDropDelegate Methods
 
-@available(iOS 11, *)
-
+@available(iOS 13.0, *)
 extension DragDropViewController : UICollectionViewDropDelegate {
     
     func collectionView(_ collectionView: UICollectionView, canHandle session: UIDropSession) -> Bool {

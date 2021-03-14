@@ -3,7 +3,7 @@
 //  Nextcloud iOS
 //
 //  Created by Marino Faggiana on 26/01/16.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2016 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -35,6 +35,10 @@
     
     UIColor *barTintColor;
     UIColor *tintColor;
+    
+    NSString *fileNameOriginal;
+    
+    UIBarButtonItem *rightButtonUpload, *leftButtonCancel;
 }
 @end
 
@@ -46,7 +50,7 @@
 
 -(void)viewDidLoad
 {
-    tableAccount *tableAccount = [[NCManageDatabase sharedInstance] getAccountActive];
+    tableAccount *tableAccount = [[NCManageDatabase shared] getAccountActive];
     
     if (tableAccount == nil) {
         
@@ -57,12 +61,26 @@
         
     } else {
         
-        // Networking
-        [[NCCommunicationCommon sharedInstance] setupWithUsername:tableAccount.userID password:[CCUtility getPassword:tableAccount.account] userAgent:[CCUtility getUserAgent] capabilitiesGroup:[NCBrandOptions sharedInstance].capabilitiesGroups delegate:[NCNetworking sharedInstance]];
-       
-        _activeAccount = tableAccount.account;
+        NSInteger serverVersionMajor = [[NCManageDatabase shared] getCapabilitiesServerIntWithAccount:tableAccount.account elements:NCElementsJSON.shared.capabilitiesVersionMajor];
+        NSString *webDav = [[NCUtilityFileSystem shared] getWebDAVWithAccount:tableAccount.account];
         
-        if ([_activeAccount isEqualToString:[CCUtility getActiveAccountExt]]) {
+        // LOG
+        NSInteger levelLog = [CCUtility getLogLevel];
+        [[NCCommunicationCommon shared] setLevelLog:levelLog];
+        
+        NSString *pathDirectoryGroup = [[CCUtility getDirectoryGroup] path];
+        [[NCCommunicationCommon shared] setPathLog: pathDirectoryGroup];
+                
+        NSString *versionNextcloudiOS = [NSString stringWithFormat:[NCBrandOptions shared].textCopyrightNextcloudiOS, NCUtility.shared.getVersionApp];
+        [[NCCommunicationCommon shared] writeLog:[NSString stringWithFormat:@"Start session with level %lu %@", (unsigned long)levelLog, versionNextcloudiOS]];
+        
+        // Networking
+        [[NCCommunicationCommon shared] setupWithAccount:tableAccount.account user:tableAccount.user userId:tableAccount.userID password:[CCUtility getPassword:tableAccount.account] urlBase:tableAccount.urlBase userAgent:[CCUtility getUserAgent] webDav:webDav dav:nil nextcloudVersion:serverVersionMajor delegate:[NCNetworking shared]];
+       
+        _account = tableAccount.account;
+        _urlBase = tableAccount.urlBase;
+        
+        if ([_account isEqualToString:[CCUtility getAccountExt]]) {
             
             // load
             
@@ -74,9 +92,9 @@
             
             // Default settings
             
-            [CCUtility setActiveAccountExt:self.activeAccount];
+            [CCUtility setAccountExt:self.account];
 
-            _serverUrl  = [CCUtility getHomeServerUrlActiveUrl:tableAccount.url];
+            _serverUrl  = [[NCUtilityFileSystem shared] getHomeServerWithUrlBase:tableAccount.urlBase account:tableAccount.account];
             [CCUtility setServerUrlExt:_serverUrl];
 
             _destinyFolderButton.title = [NSString stringWithFormat:NSLocalizedString(@"_destiny_folder_", nil), NSLocalizedString(@"_home_", nil)];
@@ -95,22 +113,12 @@
     [self loadDataSwift];
 }
 
-// Apparirà
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
         
-    if ([[CCUtility getBlockCode] length] > 0 && [CCUtility getOnlyLockDir] == NO)
-        [self openBKPasscode];
-    
-    self.view.backgroundColor = NCBrandColor.sharedInstance.backgroundView;
-    self.shareTable.backgroundColor = NCBrandColor.sharedInstance.backgroundView;
-}
-
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+    self.view.backgroundColor = NCBrandColor.shared.backgroundView;
+    self.shareTable.backgroundColor = NCBrandColor.shared.backgroundView;
 }
 
 - (void)closeShareViewController
@@ -118,12 +126,57 @@
     [self.extensionContext completeRequestReturningItems:self.extensionContext.inputItems completionHandler:nil];
 }
 
-//
-// L'applicazione terminerà
-//
 - (void)applicationWillTerminate:(UIApplication *)application
-{    
+{
     NSLog(@"[LOG] bye bye, Nextcloud Share Extension!");
+}
+
+#pragma --------------------------------------------------------------------------------------------
+#pragma mark == TextField Delegate ==
+#pragma --------------------------------------------------------------------------------------------
+
+- (void)textFieldDidBeginEditing:(UITextField *)textField
+{
+    rightButtonUpload.enabled = false;
+    fileNameOriginal = textField.text;
+}
+
+- (void)textFieldDidEndEditing:(UITextField *)textField
+{
+    rightButtonUpload.enabled = true;
+    NSInteger index = [self.filesName indexOfObject:fileNameOriginal];
+    if (index != NSNotFound) {
+        self.filesName[index] = textField.text;
+    }
+}
+
+- (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string
+{
+    NSError *error;
+    
+    if ([string isEqualToString:@"\n"]) {
+        
+        //NSString *fileName = [textField.text stringByDeletingPathExtension];
+        NSString *ext = [textField.text pathExtension];
+
+        if (![ext isEqualToString:@""]) {
+            NSString *fileNameAtPath = [NSTemporaryDirectory() stringByAppendingString:fileNameOriginal];
+            NSString *fileNameToPath = [NSTemporaryDirectory() stringByAppendingString:textField.text];
+            
+            [[NSFileManager defaultManager] moveItemAtPath:fileNameAtPath toPath:fileNameToPath error:&error];
+            
+            if (error != nil) {
+                textField.text = fileNameOriginal;
+            }
+        } else {
+            textField.text = fileNameOriginal;
+        }
+        
+        [textField endEditing:true];
+        return false;
+    }
+    
+    return true;
 }
 
 #pragma --------------------------------------------------------------------------------------------
@@ -131,19 +184,20 @@
 #pragma --------------------------------------------------------------------------------------------
 
 - (void)navigationBarToolBar
-{    
-    UIBarButtonItem *rightButtonUpload, *leftButtonCancel;
-
+{
     // Theming
-    if ([NCBrandOptions sharedInstance].use_themingColor) {
-        tableCapabilities *capabilities = [[NCManageDatabase sharedInstance] getCapabilitesWithAccount:self.activeAccount];
-        [CCGraphics settingThemingColor:capabilities.themingColor themingColorElement:capabilities.themingColorElement themingColorText:capabilities.themingColorText];
+    if ([NCBrandOptions shared].use_themingColor) {
+        NSString *themingColor = [[NCManageDatabase shared] getCapabilitiesServerStringWithAccount:self.account elements:NCElementsJSON.shared.capabilitiesThemingColor];
+        NSString *themingColorElement = [[NCManageDatabase shared] getCapabilitiesServerStringWithAccount:self.account elements:NCElementsJSON.shared.capabilitiesThemingColorElement];
+        NSString *themingColorText = [[NCManageDatabase shared] getCapabilitiesServerStringWithAccount:self.account elements:NCElementsJSON.shared.capabilitiesThemingColorText];
+        [NCBrandColor.shared settingBrandColor:themingColor themingColorElement:themingColorElement themingColorText:themingColorText];
     }
-    self.navigationController.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand;
-    self.navigationController.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText;
     
-    self.toolBar.barTintColor = NCBrandColor.sharedInstance.tabBar;
-    self.toolBar.tintColor = NCBrandColor.sharedInstance.brandElement;
+    self.navigationController.navigationBar.barTintColor = NCBrandColor.shared.brand;
+    self.navigationController.navigationBar.tintColor = NCBrandColor.shared.brandText;
+    
+    self.toolBar.barTintColor = NCBrandColor.shared.tabBar;
+    self.toolBar.tintColor = [UIColor grayColor];
     
     // Upload
     rightButtonUpload = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"_save_", nil) style:UIBarButtonItemStylePlain target:self action:@selector(selectPost)];
@@ -154,7 +208,7 @@
     // Title
     [self.navigationController.navigationBar setTitleTextAttributes: @{NSForegroundColorAttributeName:self.navigationController.navigationBar.tintColor}];
     
-    self.navigationItem.title = [NCBrandOptions sharedInstance].brand;
+    self.navigationItem.title = [NCBrandOptions shared].brand;
     self.navigationItem.leftBarButtonItem = leftButtonCancel;
     self.navigationItem.rightBarButtonItems = [[NSArray alloc] initWithObjects:rightButtonUpload, nil];
     self.navigationItem.hidesBackButton = YES;
@@ -163,7 +217,7 @@
 - (void)moveServerUrlTo:(NSString *)serverUrlTo title:(NSString *)title type:(NSString *)type
 {
     // DENIED e2e
-    if ([CCUtility isFolderEncrypted:serverUrlTo account:self.activeAccount]) {
+    if ([CCUtility isFolderEncrypted:serverUrlTo e2eEncrypted:false account:self.account urlBase:self.urlBase]) {
         return;
     }
     
@@ -178,7 +232,7 @@
         [CCUtility setTitleServerUrlExt:NSLocalizedString(@"_home_", nil)];
     }
     
-    [CCUtility setActiveAccountExt:self.activeAccount];
+    [CCUtility setAccountExt:self.account];
     [CCUtility setServerUrlExt:_serverUrl];
 }
 
@@ -204,16 +258,39 @@
 {
     if ([self.filesName count] > 0) {
     
-        [self.hud visibleHudTitle:NSLocalizedString(@"_uploading_", nil) mode:MBProgressHUDModeDeterminate color:NCBrandColor.sharedInstance.brandElement];
+        [self.hud visibleHudTitle:NSLocalizedString(@"_uploading_", nil) mode:MBProgressHUDModeDeterminate color:NCBrandColor.shared.brandElement];
         
         NSString *fileName = [self.filesName objectAtIndex:0];
-        NSString *fileNameForUpload = [[NCUtility sharedInstance] createFileName:fileName serverUrl:self.serverUrl account:self.activeAccount];
-        NSString *fileNameServer = [NSString stringWithFormat:@"%@/%@", self.serverUrl, fileNameForUpload];
         NSString *fileNameLocal = [NSTemporaryDirectory() stringByAppendingString:fileName];
+
+        // CONVERSION -->
         
-        (void)[[NCCommunication sharedInstance] uploadWithServerUrlFileName:fileNameServer fileNameLocalPath:fileNameLocal dateCreationFile:nil dateModificationFile:nil account:self.activeAccount progressHandler:^(NSProgress * progress) {
+        if ([fileName.pathExtension.uppercaseString isEqualToString:@"HEIC"] && [CCUtility getFormatCompatibility]) {
+            UIImage *image = [UIImage imageWithContentsOfFile:fileNameLocal];
+            if (image != nil) {
+                fileName = fileName.stringByDeletingPathExtension;
+                fileName = [NSString stringWithFormat:@"%@.jpg", fileName];
+                [self.filesName replaceObjectAtIndex:0 withObject:fileName];
+                fileNameLocal = [NSTemporaryDirectory() stringByAppendingString:fileName];
+                [UIImageJPEGRepresentation(image, 1.0) writeToFile:fileNameLocal atomically:YES];
+                
+                [self.shareTable reloadData];
+            }
+        }
+        
+        // <--
+        
+        NSString *fileNameForUpload = [[NCUtilityFileSystem shared] createFileName:fileName serverUrl:self.serverUrl account:self.account];
+        NSString *fileNameServer = [NSString stringWithFormat:@"%@/%@", self.serverUrl, fileNameForUpload];
+        
+        [[NCCommunication shared] uploadWithServerUrlFileName:fileNameServer fileNameLocalPath:fileNameLocal dateCreationFile:nil dateModificationFile:nil customUserAgent:nil addCustomHeaders:nil taskHandler:^(NSURLSessionTask *task) {
+                        
+        } progressHandler:^(NSProgress *progress) {
+            
             [self.hud progress:progress.fractionCompleted];
-        } completionHandler:^(NSString *account, NSString *ocId, NSString *etag, NSDate *date, NSInteger errorCode, NSString *errorDescription) {
+            
+        } completionHandler:^(NSString *account, NSString *ocId, NSString *etag, NSDate *date, int64_t size, NSDictionary *allHeaderFields, NSInteger errorCode, NSString *errorDescription) {
+            
             [self.hud hideHud];
             [self.filesName removeObject:fileName];
            
@@ -221,19 +298,15 @@
                
                 [CCUtility copyFileAtPath:fileNameLocal toPath:[CCUtility getDirectoryProviderStorageOcId:ocId fileNameView:fileNameForUpload]];
                
-                tableMetadata *metadata = [tableMetadata new];
-               
-                metadata.account = self.activeAccount;
+                tableMetadata *metadata = [[NCManageDatabase shared] createMetadataWithAccount:self.account fileName:fileNameForUpload ocId:ocId serverUrl:self.serverUrl urlBase:self.urlBase url:@"" contentType:@"" livePhoto:false];
+                               
                 metadata.date = date;
                 metadata.etag = etag;
-                metadata.ocId = ocId;
-                metadata.fileName = fileNameForUpload;
-                metadata.fileNameView = fileNameForUpload;
                 metadata.serverUrl = self.serverUrl;
-                (void)[CCUtility insertTypeFileIconName:fileNameForUpload metadata:metadata];
-               
-                metadata = [[NCManageDatabase sharedInstance] addMetadata:metadata];
-                [[NCManageDatabase sharedInstance] addLocalFileWithMetadata:metadata];
+                metadata.size = size;
+                
+                [[NCManageDatabase shared] addMetadata:metadata];
+                [[NCManageDatabase shared] addLocalFileWithMetadata:metadata];
                
                 [self.shareTable performSelectorOnMainThread:@selector(reloadData) withObject:nil waitUntilDone:NO];
                 [self performSelector:@selector(selectPost) withObject:nil];
@@ -266,71 +339,6 @@
     }
     
     [self closeShareViewController];
-}
-
-#pragma --------------------------------------------------------------------------------------------
-#pragma mark ===== Lock Password =====
-#pragma --------------------------------------------------------------------------------------------
-
-- (void)openBKPasscode
-{
-    CCBKPasscode *viewController = [[CCBKPasscode alloc] initWithNibName:nil bundle:nil];
-    viewController.delegate = self;
-    viewController.type = BKPasscodeViewControllerCheckPasscodeType;
-    viewController.inputViewTitlePassword = YES;
-    
-    if ([CCUtility getSimplyBlockCode]) {
-        
-        viewController.passcodeStyle = BKPasscodeInputViewNumericPasscodeStyle;
-        viewController.passcodeInputView.maximumLength = 6;
-        
-    } else {
-        
-        viewController.passcodeStyle = BKPasscodeInputViewNormalPasscodeStyle;
-        viewController.passcodeInputView.maximumLength = 64;
-    }
-    
-    BKTouchIDManager *touchIDManager = [[BKTouchIDManager alloc] initWithKeychainServiceName:k_serviceShareKeyChain];
-    touchIDManager.promptText = NSLocalizedString(@"_scan_fingerprint_", nil);
-    viewController.touchIDManager = touchIDManager;
-    viewController.title = [NCBrandOptions sharedInstance].brand;
-    viewController.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel target:self action:@selector(passcodeViewCloseButtonPressed:)];
-    viewController.navigationItem.leftBarButtonItem.tintColor = [UIColor blackColor];
-    
-    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:viewController];
-    navigationController.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:navigationController animated:YES completion:nil];
-}
-
-- (NSUInteger)passcodeViewControllerNumberOfFailedAttempts:(CCBKPasscode *)aViewController
-{
-    return self.failedAttempts;
-}
-
-- (NSDate *)passcodeViewControllerLockUntilDate:(CCBKPasscode *)aViewController
-{
-    return self.lockUntilDate;
-}
-
-- (void)passcodeViewCloseButtonPressed:(id)sender
-{
-    [self dismissViewControllerAnimated:YES completion:^{
-        [self performSelector:@selector(closeShareViewController) withObject:nil];
-    }];
-}
-
-- (void)passcodeViewController:(CCBKPasscode *)aViewController authenticatePasscode:(NSString *)aPasscode resultHandler:(void (^)(BOOL))aResultHandler
-{
-    if ([aPasscode isEqualToString:[CCUtility getBlockCode]]) {
-        self.lockUntilDate = nil;
-        self.failedAttempts = 0;
-        aResultHandler(YES);
-    } else aResultHandler(NO);
-}
-
-- (void)passcodeViewController:(CCBKPasscode *)aViewController didFinishWithPasscode:(NSString *)aPasscode
-{
-    [aViewController dismissViewControllerAnimated:YES completion:nil];
 }
 
 #pragma --------------------------------------------------------------------------------------------
@@ -414,7 +422,7 @@
     else if (UTTypeConformsTo(fileUTI, kUTTypeImage)) {
         image = [UIImage imageWithContentsOfFile:[NSTemporaryDirectory() stringByAppendingString:fileName]];
         if (image) {
-            image = [NCUtility.sharedInstance resizeImageWithImage:image newWidth:cell.frame.size.width];
+            image = [image resizeImageWithSize:CGSizeMake(100, 100) isAspectRation:true];
         } else {
             image = [UIImage imageNamed:@"file_photo"];
         }
@@ -431,13 +439,16 @@
     }
     else image = [UIImage imageNamed:@"file"];
     
-    
     NSUInteger fileSize = (NSInteger)[[[NSFileManager defaultManager] attributesOfItemAtPath:[NSTemporaryDirectory() stringByAppendingString:fileName] error:nil] fileSize];
     
-    cell.labelInformazioni.text = [NSString stringWithFormat:@"%@\r\r%@", fileName, [CCUtility transformedSize:fileSize]];
-    cell.labelInformazioni.textColor = NCBrandColor.sharedInstance.textView;
-
     cell.fileImageView.image = image;
+
+    cell.fileName.text = fileName;
+    cell.fileName.textColor = NCBrandColor.shared.textView;
+    cell.fileName.delegate = self;
+    
+    cell.info.text = [CCUtility transformedSize:fileSize];
+    cell.info.textColor = NCBrandColor.shared.textView;
     
     return cell;
 }

@@ -3,7 +3,7 @@
 //  Nextcloud iOS
 //
 //  Created by Marino Faggiana on 26/01/16.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2016 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -23,18 +23,14 @@
 
 #import <MBProgressHUD/MBProgressHUD.h>
 
-#import "OCNetworking.h"
-#import "CCBKPasscode.h"
-#import "CCGlobal.h"
-#import "CCGraphics.h"
 #import "CCCellShareExt.h"
 #import "NCSelectDestination.h"
-#import "CCError.h"
 #import "CCHud.h"
 
-@interface ShareViewController : UIViewController <UITableViewDelegate, MBProgressHUDDelegate, BKPasscodeViewControllerDelegate, NCSelectDestinationDelegate>
+@interface ShareViewController : UIViewController <UITableViewDelegate, MBProgressHUDDelegate, NCSelectDestinationDelegate, UITextFieldDelegate>
 
-@property (nonatomic, strong) NSString *activeAccount;
+@property (nonatomic, strong) NSString *account;
+@property (nonatomic, strong) NSString *urlBase;
 @property (nonatomic, strong) NSString *serverUrl;
 @property (nonatomic, retain) NSMutableArray *filesName;
 
@@ -43,12 +39,6 @@
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *constraintTopTableView;
 @property (nonatomic, weak) IBOutlet UIToolbar *toolBar;
 
-// 
-@property (nonatomic, strong) CCBKPasscode *viewControllerBKInit;
-@property (nonatomic) NSUInteger failedAttempts;
-@property (nonatomic, strong) NSDate *lockUntilDate;
-
-//
 @property (nonatomic, strong) CCHud *hud;
 
 - (void)closeShareViewController;

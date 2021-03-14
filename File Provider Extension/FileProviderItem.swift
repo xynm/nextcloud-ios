@@ -22,6 +22,7 @@
 //
 
 import FileProvider
+import NCCommunication
 
 class FileProviderItem: NSObject, NSFileProviderItem {
 
@@ -29,7 +30,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     var parentItemIdentifier: NSFileProviderItemIdentifier
 
     var itemIdentifier: NSFileProviderItemIdentifier {
-        return fileProviderUtility.sharedInstance.getItemIdentifier(metadata: metadata)
+        return fileProviderUtility.shared.getItemIdentifier(metadata: metadata)
     }
     
     var filename: String {
@@ -41,7 +42,8 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var typeIdentifier: String {
-        return CCUtility.insertTypeFileIconName(metadata.fileNameView, metadata: metadata)
+        let results = NCCommunicationCommon.shared.getInternalType(fileName: metadata.fileNameView, mimeType: "", directory: metadata.directory)
+        return results.uniformTypeIdentifier
     }
     
     var contentModificationDate: Date? {
@@ -49,7 +51,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var creationDate: Date? {
-        return metadata.date as Date
+        return metadata.creationDate as Date
     }
     
     var lastUsedDate: Date? {
@@ -77,7 +79,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var tagData: Data? {
-        if let tableTag = NCManageDatabase.sharedInstance.getTag(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) {
+        if let tableTag = NCManageDatabase.shared.getTag(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) {
             return tableTag.tagIOS
         } else {
             return nil
@@ -85,7 +87,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var favoriteRank: NSNumber? {
-        if let rank = fileProviderData.sharedInstance.listFavoriteIdentifierRank[metadata.ocId] {
+        if let rank = fileProviderData.shared.listFavoriteIdentifierRank[metadata.ocId] {
             return rank
         } else {
             return nil
@@ -97,7 +99,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var isDownloaded: Bool {
-        if NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) != nil {
+        if CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
             return true
         } else {
             return false
@@ -105,7 +107,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var isDownloading: Bool {
-        if metadata.status == Int(k_metadataStatusInDownload) {
+        if metadata.status == NCBrandGlobal.shared.metadataStatusDownloading {
             return true
         } else {
             return false
@@ -113,7 +115,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var downloadingError: Error? {
-        if metadata.status == Int(k_metadataStatusDownloadError) {
+        if metadata.status == NCBrandGlobal.shared.metadataStatusDownloadError {
             return fileProviderData.FileProviderError.downloadError
         } else {
             return nil
@@ -121,15 +123,15 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
 
     var isUploaded: Bool {
-        if metadata.status == Int(k_metadataStatusInUpload) {
-            return false
-        } else {
+        if NCManageDatabase.shared.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) != nil {
             return true
+        } else {
+            return false
         }
     }
     
     var isUploading: Bool {
-        if metadata.status == Int(k_metadataStatusInUpload) {
+        if metadata.status == NCBrandGlobal.shared.metadataStatusUploading {
             return true
         } else {
             return false
@@ -137,7 +139,7 @@ class FileProviderItem: NSObject, NSFileProviderItem {
     }
     
     var uploadingError: Error? {
-        if metadata.status == Int(k_metadataStatusUploadError) {
+        if metadata.status == NCBrandGlobal.shared.metadataStatusUploadError {
             return fileProviderData.FileProviderError.uploadError
         } else {
             return nil

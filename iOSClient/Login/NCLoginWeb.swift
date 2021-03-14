@@ -22,18 +22,32 @@
 //
 
 import Foundation
+import WebKit
+import NCCommunication
 
 class NCLoginWeb: UIViewController {
     
+    var activityIndicator: UIActivityIndicatorView!
     var webView: WKWebView?
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
 
     @objc var urlBase = ""
-
-    @IBOutlet weak var buttonExit: UIButton!
-
+    
+    @objc var loginFlowV2Available = false
+    @objc var loginFlowV2Token = ""
+    @objc var loginFlowV2Endpoint = ""
+    @objc var loginFlowV2Login = ""
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        if (NCBrandOptions.shared.use_login_web_personalized) {
+            if let accountCount = NCManageDatabase.shared.getAccounts()?.count {
+                if(accountCount > 0) {
+                    self.navigationItem.leftBarButtonItem = UIBarButtonItem.init(barButtonSystemItem: .stop, target: self, action: #selector(self.closeView(sender:)))
+                }
+            }
+        }
         
         let config = WKWebViewConfiguration()
         config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
@@ -41,21 +55,32 @@ class NCLoginWeb: UIViewController {
         webView = WKWebView(frame: CGRect.zero, configuration: config)
         webView!.navigationDelegate = self
         view.addSubview(webView!)
+        
         webView!.translatesAutoresizingMaskIntoConstraints = false
         webView!.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0).isActive = true
         webView!.rightAnchor.constraint(equalTo: view.rightAnchor, constant: 0).isActive = true
         webView!.topAnchor.constraint(equalTo: view.topAnchor, constant: 0).isActive = true
         webView!.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 0).isActive = true
         
-        // ADD k_flowEndpoint for Web Flow
-        if NCBrandOptions.sharedInstance.use_login_web_personalized == false && urlBase != NCBrandOptions.sharedInstance.linkloginPreferredProviders {
-            urlBase =  urlBase + k_flowEndpoint
+        // ADD end point for Web Flow
+        if urlBase != NCBrandOptions.shared.linkloginPreferredProviders {
+            if loginFlowV2Available {
+                urlBase = loginFlowV2Login
+            } else {
+                urlBase = urlBase + "/index.php/login/flow"
+            }
         }
         
-        // buttonExitVisible
-        self.view.bringSubviewToFront(buttonExit)
+        activityIndicator = UIActivityIndicatorView(style: .gray)
+        activityIndicator.center = self.view.center
+        activityIndicator.startAnimating()
+        self.view.addSubview(activityIndicator)
         
-        loadWebPage(webView: webView!, url: URL(string: urlBase)!)
+        if let url = URL(string: urlBase) {
+            loadWebPage(webView: webView!, url: url)
+        } else {
+            NCContentPresenter.shared.messageNotification("_error_", description: "_login_url_error_", delay: NCBrandGlobal.shared.dismissAfterSecond, type: NCContentPresenter.messageType.error, errorCode: NCBrandGlobal.shared.ErrorInternalError, forced: true)
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -77,19 +102,17 @@ class NCLoginWeb: UIViewController {
         let language = NSLocale.preferredLanguages[0] as String
         var request = URLRequest(url: url)
         
-        request.setValue(CCUtility.getUserAgent(), forHTTPHeaderField: "User-Agent")
         request.addValue("true", forHTTPHeaderField: "OCS-APIRequest")
         request.addValue(language, forHTTPHeaderField: "Accept-Language")
+        webView.customUserAgent = CCUtility.getUserAgent()
         
         webView.load(request)
     }
     
-    @IBAction func touchUpInsideButtonExit(_ sender: UIButton) {
-        
-        self.dismiss(animated: true) {
-            NotificationCenter.default.post(name: NSNotification.Name(rawValue: "dismissCCLogin"), object: nil, userInfo: nil)
-        }
+    @objc func closeView(sender: UIBarButtonItem) {
+        self.dismiss(animated: true, completion: nil)
     }
+    
 }
 
 extension NCLoginWeb: WKNavigationDelegate {
@@ -100,52 +123,26 @@ extension NCLoginWeb: WKNavigationDelegate {
         
         let urlString: String = url.absoluteString.lowercased()
         
-        if (urlString.hasPrefix(NCBrandOptions.sharedInstance.webLoginAutenticationProtocol) == true && urlString.contains("login") == true) {
+        if (urlString.hasPrefix(NCBrandOptions.shared.webLoginAutenticationProtocol) == true && urlString.contains("login") == true) {
+            
+            var server: String = ""
+            var user: String = ""
+            var password: String = ""
             
             let keyValue = url.path.components(separatedBy: "&")
-            if (keyValue.count >= 3) {
+            for value in keyValue {
+                if value.contains("server:") { server = value }
+                if value.contains("user:") { user = value }
+                if value.contains("password:") { password = value }
+            }
+            
+            if server != "" && user != "" && password != "" {
                 
-                if (keyValue[0].contains("server:") && keyValue[1].contains("user:") && keyValue[2].contains("password:")) {
-                    
-                    var serverUrl : String = keyValue[0].replacingOccurrences(of: "/server:", with: "")
-                    
-                    // Login Flow NC 12
-                    if (NCBrandOptions.sharedInstance.use_login_web_personalized == false && serverUrl.hasPrefix("http://") == false && serverUrl.hasPrefix("https://") == false) {
-                        serverUrl = urlBase
-                    }
-                    
-                    if (serverUrl.last == "/") {
-                        serverUrl = String(serverUrl.dropLast())
-                    }
-                    
-                    let username : String = keyValue[1].replacingOccurrences(of: "user:", with: "").replacingOccurrences(of: "+", with: " ")
-                    let token : String = keyValue[2].replacingOccurrences(of: "password:", with: "")
-                    
-                    let account : String = "\(username) \(serverUrl)"
-                    
-                    // NO account found, clear
-                    if NCManageDatabase.sharedInstance.getAccounts() == nil { NCUtility.sharedInstance.removeAllSettings() }
-                        
-                    // STOP Intro
-                    CCUtility.setIntro(true)
-                        
-                    // Add new account
-                    NCManageDatabase.sharedInstance.deleteAccount(account)
-                    NCManageDatabase.sharedInstance.addAccount(account, url: serverUrl, user: username, password: token)
-                        
-                    guard let tableAccount = NCManageDatabase.sharedInstance.setAccountActive(account) else {
-                        self.dismiss(animated: true, completion: nil)
-                        return
-                    }
-                        
-                    appDelegate.settingActiveAccount(account, activeUrl: serverUrl, activeUser: username, activeUserID: tableAccount.userID, activePassword: token)
-                        
-                    NotificationCenter.default.post(name: NSNotification.Name(rawValue: "initializeMain"), object: nil, userInfo: nil)
-                    
-                    self.dismiss(animated: true) {
-                        NotificationCenter.default.post(name: NSNotification.Name(rawValue: "dismissCCLogin"), object: nil, userInfo: nil)
-                    } 
-                }
+                let server: String = server.replacingOccurrences(of: "/server:", with: "")
+                let username: String = user.replacingOccurrences(of: "user:", with: "").replacingOccurrences(of: "+", with: " ")
+                let password: String = password.replacingOccurrences(of: "password:", with: "")
+                
+                createAccount(server: server, username: username, password: password)
             }
         }
     }
@@ -168,7 +165,7 @@ extension NCLoginWeb: WKNavigationDelegate {
             return
         }
         
-        if String(describing: url).hasPrefix(NCBrandOptions.sharedInstance.webLoginAutenticationProtocol) {
+        if String(describing: url).hasPrefix(NCBrandOptions.shared.webLoginAutenticationProtocol) {
             decisionHandler(.allow)
             return
         } else if navigationAction.request.httpMethod != "GET" || navigationAction.request.value(forHTTPHeaderField: "OCS-APIRequest") != nil {
@@ -194,6 +191,71 @@ extension NCLoginWeb: WKNavigationDelegate {
     }
     
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        activityIndicator.stopAnimating()
         print("didFinishProvisionalNavigation");
+        
+        if loginFlowV2Available {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                NCCommunication.shared.getLoginFlowV2Poll(token: self.loginFlowV2Token, endpoint: self.loginFlowV2Endpoint) { (server, loginName, appPassword, errorCode, errorDescription) in
+                    if errorCode == 0 && server != nil && loginName != nil && appPassword != nil {
+                        self.createAccount(server: server!, username: loginName!, password: appPassword!)
+                    }
+                }
+            }
+        }
+    }
+    
+    //MARK: -
+
+    func createAccount(server: String, username: String, password: String) {
+        
+        var urlBase = server
+        
+        // NO account found, clear all
+        if NCManageDatabase.shared.getAccounts() == nil { NCUtility.shared.removeAllSettings() }
+            
+        // Normalized
+        if (urlBase.last == "/") {
+            urlBase = String(urlBase.dropLast())
+        }
+        
+        // Create account
+        let account: String = "\(username) \(urlBase)"
+
+        // Add new account
+        NCManageDatabase.shared.deleteAccount(account)
+        NCManageDatabase.shared.addAccount(account, urlBase: urlBase, user: username, password: password)
+            
+        guard let tableAccount = NCManageDatabase.shared.setAccountActive(account) else {
+            self.dismiss(animated: true, completion: nil)
+            return
+        }
+            
+        appDelegate.settingAccount(account, urlBase: urlBase, user: username, userID: tableAccount.userID, password: password)
+            
+        if (CCUtility.getIntro()) {
+            
+            NotificationCenter.default.postOnMainThread(name: NCBrandGlobal.shared.notificationCenterInitializeMain)
+            self.dismiss(animated: true)
+                
+        } else {
+            
+            CCUtility.setIntro(true)
+            if (self.presentingViewController == nil) {
+                if let viewController = UIStoryboard(name: "Main", bundle: nil).instantiateInitialViewController() {
+                    viewController.modalPresentationStyle = .fullScreen
+                    NotificationCenter.default.postOnMainThread(name: NCBrandGlobal.shared.notificationCenterInitializeMain)
+                    viewController.view.alpha = 0
+                    appDelegate.window.rootViewController = viewController
+                    appDelegate.window.makeKeyAndVisible()
+                    UIView.animate(withDuration: 0.5) {
+                        viewController.view.alpha = 1
+                    }
+                }
+            } else {
+                NotificationCenter.default.postOnMainThread(name: NCBrandGlobal.shared.notificationCenterInitializeMain)
+                self.dismiss(animated: true)
+            }
+        }
     }
 }

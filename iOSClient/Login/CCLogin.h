@@ -3,7 +3,7 @@
 //  Nextcloud
 //
 //  Created by Marino Faggiana on 09/04/15.
-//  Copyright (c) 2017 Marino Faggiana. All rights reserved.
+//  Copyright (c) 2015 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -23,9 +23,6 @@
 
 #import <UIKit/UIKit.h>
 
-#import "UIImage+animatedGIF.h"
-#import "OCNetworking.h"
-
 @class NCLoginWeb;
 @class NCLoginQRCode;
 
@@ -44,7 +41,6 @@
 @property (nonatomic, weak) IBOutlet UIActivityIndicatorView *activity;
 
 @property (nonatomic, weak) IBOutlet UIButton *login;
-@property (nonatomic, weak) IBOutlet UIButton *annulla;
 @property (nonatomic, weak) IBOutlet UIButton *toggleVisiblePassword;
 @property (nonatomic, weak) IBOutlet UIButton *loginTypeView;
 
