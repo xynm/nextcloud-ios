@@ -21,131 +21,130 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import UIKit
 import FileProvider
+import NextcloudKit
+import UniformTypeIdentifiers
 
 class FileProviderItem: NSObject, NSFileProviderItem {
-
     var metadata: tableMetadata
-    var parentItemIdentifier: NSFileProviderItemIdentifier
-
+    /// Providing Required Properties
     var itemIdentifier: NSFileProviderItemIdentifier {
-        return fileProviderUtility.sharedInstance.getItemIdentifier(metadata: metadata)
+        return fileProviderUtility().getItemIdentifier(metadata: metadata)
     }
-    
     var filename: String {
         return metadata.fileNameView
     }
-    
-    var documentSize: NSNumber? {
-        return NSNumber(value: metadata.size)
-    }
-    
     var typeIdentifier: String {
-        return CCUtility.insertTypeFileIconName(metadata.fileNameView, metadata: metadata)
+        let results = NextcloudKit.shared.nkCommonInstance.getInternalType(fileName: metadata.fileNameView, mimeType: "", directory: metadata.directory)
+        return results.typeIdentifier
     }
-    
-    var contentModificationDate: Date? {
-        return metadata.date as Date
-    }
-    
-    var creationDate: Date? {
-        return metadata.date as Date
-    }
-    
-    var lastUsedDate: Date? {
-        return metadata.date as Date
-    }
-
     var capabilities: NSFileProviderItemCapabilities {
-        if (metadata.directory) {
+        if metadata.directory {
             return [ .allowsAddingSubItems, .allowsContentEnumerating, .allowsReading, .allowsDeleting, .allowsRenaming ]
-        } else {
-            return [ .allowsWriting, .allowsReading, .allowsDeleting, .allowsRenaming, .allowsReparenting ]
+        } else if metadata.lock {
+            return [ .allowsReading ]
         }
+        return [ .allowsWriting, .allowsReading, .allowsDeleting, .allowsRenaming, .allowsReparenting ]
     }
-    
+    /// Managing Content
+    var childItemCount: NSNumber? {
+        return metadata.directory ? nil : nil
+    }
+    var documentSize: NSNumber? {
+        return metadata.directory ? nil : NSNumber(value: metadata.size)
+    }
+    /// Specifying Content Location
+    var parentItemIdentifier: NSFileProviderItemIdentifier
     var isTrashed: Bool {
         return false
     }
-    
-    var childItemCount: NSNumber? {
+    var symlinkTargetPath: String? {
         return nil
     }
-
+    /// Tracking Usage
+    var contentModificationDate: Date? {
+        return metadata.date as Date
+    }
+    var creationDate: Date? {
+        return metadata.creationDate as Date
+    }
+    var lastUsedDate: Date? {
+        return metadata.date as Date
+    }
+    /// Tracking Versions
     var versionIdentifier: Data? {
         return metadata.etag.data(using: .utf8)
     }
-    
+    var isMostRecentVersionDownloaded: Bool {
+        if NCManageDatabase.shared.getTableLocalFile(ocId: metadata.ocId) == nil {
+            return false
+        } else {
+            return true
+        }
+    }
+    /// Monitoring File Transfers
+    var isUploading: Bool {
+        if metadata.status == NCGlobal.shared.metadataStatusWaitUpload || metadata.status == NCGlobal.shared.metadataStatusUploading {
+            return true
+        } else {
+            return false
+        }
+    }
+    var isUploaded: Bool {
+        if metadata.status == NCGlobal.shared.metadataStatusWaitUpload || metadata.status == NCGlobal.shared.metadataStatusUploading || metadata.status == NCGlobal.shared.metadataStatusUploadError {
+            return false
+        } else {
+            return true
+        }
+    }
+    var uploadingError: Error? {
+        if metadata.status == NCGlobal.shared.metadataStatusUploadError {
+            return fileProviderData.FileProviderError.uploadError
+        } else {
+            return nil
+        }
+    }
+    var isDownloading: Bool {
+        if metadata.status == NCGlobal.shared.metadataStatusWaitDownload || metadata.status == NCGlobal.shared.metadataStatusDownloading {
+            return true
+        } else {
+            return false
+        }
+    }
+    var isDownloaded: Bool {
+        if NCUtilityFileSystem().fileProviderStorageExists(metadata) {
+            return true
+        } else {
+            return false
+        }
+    }
+    var downloadingError: Error? {
+        if metadata.status == NCGlobal.shared.metadataStatusDownloadError {
+            return fileProviderData.FileProviderError.downloadError
+        } else {
+            return nil
+        }
+    }
+    /// Sharing
+    /// Managing Metadata
     var tagData: Data? {
-        if let tableTag = NCManageDatabase.sharedInstance.getTag(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) {
+        if let tableTag = NCManageDatabase.shared.getTag(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) {
             return tableTag.tagIOS
         } else {
             return nil
         }
     }
-    
     var favoriteRank: NSNumber? {
-        if let rank = fileProviderData.sharedInstance.listFavoriteIdentifierRank[metadata.ocId] {
+        if let rank = fileProviderData.shared.listFavoriteIdentifierRank[metadata.ocId] {
             return rank
         } else {
             return nil
         }
     }
 
-    var isMostRecentVersionDownloaded: Bool {
-        return true
-    }
-    
-    var isDownloaded: Bool {
-        if NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId)) != nil {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    var isDownloading: Bool {
-        if metadata.status == Int(k_metadataStatusInDownload) {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    var downloadingError: Error? {
-        if metadata.status == Int(k_metadataStatusDownloadError) {
-            return fileProviderData.FileProviderError.downloadError
-        } else {
-            return nil
-        }
-    }
-
-    var isUploaded: Bool {
-        if metadata.status == Int(k_metadataStatusInUpload) {
-            return false
-        } else {
-            return true
-        }
-    }
-    
-    var isUploading: Bool {
-        if metadata.status == Int(k_metadataStatusInUpload) {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    var uploadingError: Error? {
-        if metadata.status == Int(k_metadataStatusUploadError) {
-            return fileProviderData.FileProviderError.uploadError
-        } else {
-            return nil
-        }
-    }
-
     init(metadata: tableMetadata, parentItemIdentifier: NSFileProviderItemIdentifier) {
-        self.metadata = metadata
+        self.metadata = tableMetadata(value: metadata)
         self.parentItemIdentifier = parentItemIdentifier
     }
 }

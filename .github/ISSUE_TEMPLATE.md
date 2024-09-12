@@ -1,21 +1,41 @@
-### Expected behaviour                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+### Steps to reproduce
 
-### Actual behaviour                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+1.
+2.
+3.
 
-### Steps to reproduce                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+### Expected behaviour
 
-### iOS version
+Tell us what should happen.
 
-### App version
+### Actual behaviour
 
-### Server configuration
+Tell was what instead happens.
 
-**Operating system:**
+### Screenshots
 
-**Web server:**
+If applicable, add a screenshot showing the issue.
+
+### Logs
+
+```
+If applicable, you can post the iOS app or server logs (removing any sensitive information).
+```
+
+### Reasoning or why should it be changed/implemented?
+
+### Environment data
+
+**iOS version:** e.g. iOS 14.4.1
+
+**Nextcloud iOS app version:** see More > Settings
+
+**Server operating system:**
+
+**Web server:** Apache, nginx
 
 **Database:**
 
 **PHP version:**
 
-**Nextcloud version:** (see Nextcloud admin page)
+**Nextcloud version:** see Nextcloud admin page

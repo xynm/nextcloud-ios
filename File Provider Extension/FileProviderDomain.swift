@@ -3,7 +3,7 @@
 //  Nextcloud
 //
 //  Created by Marino Faggiana on 04/06/2019.
-//  Copyright © 2018 Marino Faggiana. All rights reserved.
+//  Copyright © 2019 Marino Faggiana. All rights reserved.
 //
 //  Author Marino Faggiana <marino.faggiana@nextcloud.com>
 //
@@ -21,72 +21,61 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+import UIKit
 
 class FileProviderDomain: NSObject {
-    @objc static let sharedInstance: FileProviderDomain = {
-        let instance = FileProviderDomain()
-        return instance
-    }()
-
-    @available(iOS 11.0, *) @objc func registerDomain() {
-        
-        NSFileProviderManager.getDomainsWithCompletionHandler { (fileProviderDomain, error) in
-            
-            var domains = [String]()
+    func registerDomains() {
+        NSFileProviderManager.getDomainsWithCompletionHandler { fileProviderDomain, error in
+            var domains: [String] = []
             let pathRelativeToDocumentStorage = NSFileProviderManager.default.documentStorageURL.absoluteString
-            let tableAccounts = NCManageDatabase.sharedInstance.getAllAccount()
-            
-            for domain in fileProviderDomain {
-                domains.append(domain.identifier.rawValue)
-            }
-            
-            // Delete all domains
-            for domain in domains {
-                let domainRawValue = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier(rawValue: domain), displayName: domain, pathRelativeToDocumentStorage: pathRelativeToDocumentStorage)
-                NSFileProviderManager.remove(domainRawValue, completionHandler: { (error) in
-                    if error != nil {
-                        print("Error  domain: \(domainRawValue) error: \(String(describing: error))")
-                    }
-                })
-            }
-            
-            // Check account->domain & (add)
-            for tableAccount in tableAccounts {
-                guard let url = NSURL(string: tableAccount.url) else {
-                    continue
-                }
-                guard let host = url.host else {
-                    continue
-                }
-                let accountDomain =  tableAccount.userID + " (" + host + ")"
-                let domainRawValue = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier(rawValue: accountDomain), displayName: accountDomain, pathRelativeToDocumentStorage: pathRelativeToDocumentStorage)
-                NSFileProviderManager.add(domainRawValue, completionHandler: { (error) in
-                    if error != nil {
-                        print("Error  domain: \(domainRawValue) error: \(String(describing: error))")
-                    }
-                })
-            }
-        }
-    }
-    
-    @available(iOS 11.0, *) @objc func removeAllDomain() {
-        
-        NSFileProviderManager.getDomainsWithCompletionHandler { (fileProviderDomain, error) in
-            
-            var domains = [String]()
-            let pathRelativeToDocumentStorage = NSFileProviderManager.default.documentStorageURL.absoluteString
+            let accounts = NCManageDatabase.shared.getAllAccount()
 
             for domain in fileProviderDomain {
                 domains.append(domain.identifier.rawValue)
             }
+
+            // Delete
             for domain in domains {
-                let domainRawValue = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier(rawValue: domain), displayName: domain, pathRelativeToDocumentStorage: pathRelativeToDocumentStorage)
-                NSFileProviderManager.remove(domainRawValue, completionHandler: { (error) in
-                    if error != nil {
-                        print("Error  domain: \(domainRawValue) error: \(String(describing: error))")
+                var domainFound = false
+                for account in accounts {
+                    guard let urlBase = NSURL(string: account.urlBase) else { continue }
+                    guard let host = urlBase.host else { continue }
+                    let accountDomain = account.userId + " (" + host + ")"
+                    if domain == accountDomain {
+                        domainFound = true
+                        break
                     }
-                })
+                }
+                if !domainFound {
+                    let fileProviderDomain = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier(rawValue: domain), displayName: domain, pathRelativeToDocumentStorage: pathRelativeToDocumentStorage)
+                    NSFileProviderManager.remove(fileProviderDomain, completionHandler: { error in
+                        if let error {
+                            print("Error  domain: \(fileProviderDomain) error: \(String(describing: error))")
+                        }
+                    })
+                }
+            }
+
+            // Add
+            for account in accounts {
+                var domainFound = false
+                guard let urlBase = NSURL(string: account.urlBase) else { continue }
+                guard let host = urlBase.host else { continue }
+                let accountDomain = account.userId + " (" + host + ")"
+                for domain in domains {
+                    if domain == accountDomain {
+                        domainFound = true
+                        break
+                    }
+                }
+                if !domainFound {
+                    let fileProviderDomain = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier(rawValue: accountDomain), displayName: accountDomain, pathRelativeToDocumentStorage: pathRelativeToDocumentStorage)
+                    NSFileProviderManager.add(fileProviderDomain, completionHandler: { error in
+                        if let error {
+                            print("Error  domain: \(fileProviderDomain) error: \(String(describing: error))")
+                        }
+                    })
+                }
             }
         }
     }

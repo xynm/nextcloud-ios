@@ -21,53 +21,39 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import UIKit
 import FileProvider
-import NCCommunication
+import NextcloudKit
 
 extension FileProviderExtension {
-
     override func fetchThumbnails(for itemIdentifiers: [NSFileProviderItemIdentifier], requestedSize size: CGSize, perThumbnailCompletionHandler: @escaping (NSFileProviderItemIdentifier, Data?, Error?) -> Void, completionHandler: @escaping (Error?) -> Void) -> Progress {
-                
         let progress = Progress(totalUnitCount: Int64(itemIdentifiers.count))
         var counterProgress: Int64 = 0
-        
+
         for itemIdentifier in itemIdentifiers {
-            
-            guard let metadata = fileProviderUtility.sharedInstance.getTableMetadataFromItemIdentifier(itemIdentifier) else {
-                
+            guard let metadata = providerUtility.getTableMetadataFromItemIdentifier(itemIdentifier), metadata.hasPreview else {
                 counterProgress += 1
-                if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+                if counterProgress == progress.totalUnitCount { completionHandler(nil) }
                 continue
             }
-            
-            if (metadata.hasPreview) {
-                
-                let width = NCUtility.sharedInstance.getScreenWidthForPreview()
-                let height = NCUtility.sharedInstance.getScreenHeightForPreview()
-                
-                let fileNamePath = CCUtility.returnFileNamePath(fromFileName: metadata.fileName, serverUrl: metadata.serverUrl, activeUrl: fileProviderData.sharedInstance.accountUrl)!
-                let fileNameLocalPath = CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileNameView)!
-                let serverUrl = fileProviderData.sharedInstance.accountUrl
-                    
-                NCCommunication.sharedInstance.downloadPreview(serverUrl: serverUrl, fileNamePath: fileNamePath, fileNameLocalPath: fileNameLocalPath ,width: width, height: height, account: fileProviderData.sharedInstance.account) { (account, data, errorCode, errorDescription) in
-                    if errorCode == 0 && data != nil {
-                        perThumbnailCompletionHandler(itemIdentifier, data, nil)
-                    } else {
-                        perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.serverUnreachable))
-                    }
-                    
-                    counterProgress += 1
-                    if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+            let fileNameIconLocalPath = utilityFileSystem.getDirectoryProviderStorageIconOcId(metadata.ocId, etag: metadata.etag)
+
+            NextcloudKit.shared.downloadPreview(fileId: metadata.fileId, widthPreview: Int(size.width), heightPreview: Int(size.height), etag: metadata.etag, account: metadata.account) { _ in
+            } completion: { _, data, error in
+                if error == .success, let data {
+                    do {
+                        try data.write(to: URL(fileURLWithPath: fileNameIconLocalPath), options: .atomic)
+                    } catch { }
+                    perThumbnailCompletionHandler(itemIdentifier, data, nil)
+                } else {
+                    perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.serverUnreachable))
                 }
-               
-            } else {
-                
                 counterProgress += 1
-                if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+                if counterProgress == progress.totalUnitCount {
+                    completionHandler(nil)
+                }
             }
         }
-        
         return progress
     }
-    
 }
